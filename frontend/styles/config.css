@@ -1,0 +1,31 @@
+.page-config .section-card { margin-bottom: 16px; }
+.page-config .btn-primary { margin-bottom: 16px; }
+
+.theme-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+.theme-toggle-info { display: flex; flex-direction: column; gap: 2px; }
+.theme-toggle-label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
+.theme-toggle-value { font-size: 0.75rem; color: var(--text-dim); }
+
+.theme-toggle {
+  position: relative; width: 52px; height: 28px;
+  background: var(--border); border: none; border-radius: 14px;
+  cursor: pointer; padding: 0; transition: background 0.3s;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-toggle.active { background: var(--brand); }
+.theme-toggle-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; background: #fff; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.theme-toggle.active .theme-toggle-thumb { transform: translateX(24px); }
+.theme-toggle .icon-moon { display: block; color: #64748b; }
+.theme-toggle .icon-sun { display: none; color: #f59e0b; }
+.theme-toggle.active .icon-moon { display: none; }
+.theme-toggle.active .icon-sun { display: block; }
+
+.danger-zone { border-color: rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.04); }
+.danger-zone h3 { color: var(--red); }
+.danger-text { font-size: 0.75rem; color: var(--text-dim); text-align: center; margin-top: 8px; }

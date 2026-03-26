@@ -1,0 +1,149 @@
+.par-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.par-summary-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 8px;
+  text-align: center;
+}
+.par-summary-value { display: block; font-size: 1.25rem; font-weight: 700; color: var(--red); font-variant-numeric: tabular-nums; }
+.par-summary-label { display: block; font-size: 0.625rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.3px; margin-top: 4px; }
+
+/* Filter chips */
+.par-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.filter-chip:active { transform: scale(0.95); }
+.filter-chip.active {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+.filter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Bar charts */
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bar-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bar-reason {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.bar-cat-badge {
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.bar-track {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.bar-value {
+  font-size: 0.6875rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stop cards */
+.par-list { display: flex; flex-direction: column; gap: 8px; }
+
+.par-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 12px 14px;
+}
+.par-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+.par-card-reason { font-size: 0.875rem; font-weight: 600; color: var(--text); flex: 1; }
+.par-card-duration {
+  font-size: 0.75rem; font-weight: 600;
+  color: var(--red); background: var(--red-dim);
+  padding: 2px 8px; border-radius: 10px;
+  white-space: nowrap; margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.par-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.6875rem;
+  flex-wrap: wrap;
+}
+.par-card-cat {
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.par-card-time {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-state-sm {
+  text-align: center;
+  padding: 16px;
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+}

@@ -1,0 +1,110 @@
+<div class="page page-medicao">
+  <header class="page-header">
+    <h1>Medição</h1>
+    <span class="badge" id="med-status-badge">Aguardando</span>
+  </header>
+
+  <div id="med-not-configured" class="empty-state">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+    <p>Configure antes de medir</p>
+    <span>Vá em <strong>Config</strong> para definir cliente, máquina e turno</span>
+  </div>
+
+  <div id="med-content" class="hidden">
+    <div id="med-pre-start">
+      <div class="med-timer">
+        <span class="med-timer-label">Pronto para iniciar</span>
+        <span class="med-timer-sub" id="med-machine-name-pre">—</span>
+      </div>
+      <div class="section-card">
+        <h3>Produção do dia até agora</h3>
+        <p class="modal-sub">Informe o valor atual do contador da máquina</p>
+        <input type="number" id="initial-production-input" placeholder="Ex: 24500" class="input input-lg" inputmode="numeric">
+      </div>
+      <button class="btn btn-primary btn-block" id="btn-start-measurement" style="margin-top: 16px;">Iniciar medição</button>
+    </div>
+
+    <div id="med-active" class="hidden">
+      <div class="med-timer">
+        <span class="med-timer-label" id="med-state-label">Parado</span>
+        <span class="med-timer-value" id="med-timer">00:00:00</span>
+        <span class="med-timer-sub" id="med-machine-name">—</span>
+      </div>
+
+      <div class="med-buttons">
+        <button class="med-btn med-btn-marcha" id="btn-marcha">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Marcha</span>
+        </button>
+        <button class="med-btn med-btn-parada" id="btn-parada">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          <span>Parada</span>
+        </button>
+      </div>
+
+      <div class="med-counters">
+        <div class="med-counter">
+          <span class="med-counter-value" id="med-stop-count">0</span>
+          <span class="med-counter-label">Paradas</span>
+        </div>
+        <div class="med-counter">
+          <span class="med-counter-value" id="med-stop-time">00:00</span>
+          <span class="med-counter-label">Total parado</span>
+        </div>
+        <div class="med-counter">
+          <span class="med-counter-value" id="med-current-stop">00:00</span>
+          <span class="med-counter-label">Parada atual</span>
+        </div>
+        <div class="med-counter">
+          <span class="med-counter-value" id="med-production">0</span>
+          <span class="med-counter-label">Produção</span>
+        </div>
+      </div>
+
+      <button class="btn btn-danger btn-block" id="btn-finalize" style="margin-top: 16px;">Finalizar medição</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="modal-stop-reason">
+    <div class="modal">
+      <h3>Motivo da parada</h3>
+      <p class="modal-sub">Selecione o motivo ou digite um novo</p>
+      <div class="alarm-list" id="alarm-list-modal"></div>
+      <div class="modal-input-row">
+        <input type="text" id="custom-reason-input" placeholder="Outro motivo..." class="input">
+        <button class="btn btn-sm" id="btn-add-custom-reason">+</button>
+      </div>
+      <button class="btn btn-primary" id="btn-confirm-reason">Confirmar</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="modal-production">
+    <div class="modal">
+      <h3>Informe a produção</h3>
+      <p class="modal-sub">Valor atual do contador da máquina</p>
+      <input type="number" id="production-input" placeholder="Ex: 4500" class="input input-lg" inputmode="numeric">
+      <button class="btn btn-primary" id="btn-confirm-production">Confirmar</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="modal-shift-end">
+    <div class="modal">
+      <h3>Fim do turno</h3>
+      <p class="modal-sub">O horário de fim do turno foi atingido</p>
+      <button class="btn btn-danger btn-block" id="btn-end-shift" style="margin-bottom: 12px;">Finalizar medição</button>
+      <p class="modal-sub">Ou defina um novo horário de fim:</p>
+      <input type="time" id="new-shift-end-input" class="input" style="margin-bottom: 12px;">
+      <button class="btn btn-outline btn-block" id="btn-extend-shift">Estender turno</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay hidden" id="modal-finalize">
+    <div class="modal">
+      <h3>Finalizar medição</h3>
+      <p class="modal-sub">Informe a produção final (opcional — deixe vazio para usar a última leitura)</p>
+      <input type="number" id="final-production-input" placeholder="Produção final (opcional)" class="input input-lg" inputmode="numeric">
+      <button class="btn btn-danger btn-block" id="btn-confirm-finalize" style="margin-top: 12px;">Confirmar e encerrar</button>
+      <button class="btn btn-outline btn-block" id="btn-cancel-finalize" style="margin-top: 8px;">Cancelar</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,53 @@
+<div class="page page-paradas">
+  <header class="page-header">
+    <h1>Paradas</h1>
+    <span class="badge" id="par-count-badge">0</span>
+  </header>
+
+  <div id="par-no-data" class="empty-state">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 12h8"/></svg>
+    <p>Nenhuma parada registrada</p>
+    <span>As paradas aparecerão aqui durante a medição</span>
+  </div>
+
+  <div id="par-content" class="hidden">
+    <!-- Summary KPIs -->
+    <div class="par-summary">
+      <div class="par-summary-item">
+        <span class="par-summary-value" id="par-total-stops">0</span>
+        <span class="par-summary-label">Total</span>
+      </div>
+      <div class="par-summary-item">
+        <span class="par-summary-value" id="par-total-time">00:00</span>
+        <span class="par-summary-label">Tempo total</span>
+      </div>
+      <div class="par-summary-item">
+        <span class="par-summary-value" id="par-avg-time">00:00</span>
+        <span class="par-summary-label">Média</span>
+      </div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="par-filters" id="par-filters">
+      <button class="filter-chip active" data-filter="all">Todas</button>
+    </div>
+
+    <!-- Bar chart: time per reason -->
+    <div class="section-card">
+      <h3>Tempo por motivo</h3>
+      <div class="bar-chart" id="par-bar-chart"></div>
+    </div>
+
+    <!-- Bar chart: time per category -->
+    <div class="section-card">
+      <h3>Tempo por categoria</h3>
+      <div class="bar-chart" id="par-cat-chart"></div>
+    </div>
+
+    <!-- Stop list -->
+    <div class="section-card">
+      <h3>Histórico</h3>
+      <div class="par-list" id="par-list"></div>
+    </div>
+  </div>
+</div>
