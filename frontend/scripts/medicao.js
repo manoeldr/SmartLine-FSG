@@ -16,15 +16,17 @@ export function initMedicao() {
 
   // Se não configurou cliente/máquina/velocidade, mostra aviso
   if (!store.isConfigured()) {
-    notConfigured.classList.remove('hidden');
-    content.classList.add('hidden');
-    badge.textContent = 'Não configurado';
-    badge.className = 'badge';
+    if (notConfigured) notConfigured.classList.remove('hidden');
+    if (content) content.classList.add('hidden');
+    if (badge) {
+      badge.textContent = 'Não configurado';
+      badge.className = 'badge';
+    }
     return;
   }
 
-  notConfigured.classList.add('hidden');
-  content.classList.remove('hidden');
+  if (notConfigured) notConfigured.classList.add('hidden');
+  if (content) content.classList.remove('hidden');
 
   const m = store.measurement;
 
@@ -42,103 +44,130 @@ export function initMedicao() {
 
 // Tela pré-início: pede o valor do contador de produção antes de iniciar
 function showPreStartScreen() {
-  document.getElementById('med-pre-start').classList.remove('hidden');
-  document.getElementById('med-active').classList.add('hidden');
-  document.getElementById('med-machine-name-pre').textContent = store.config.machine;
+  const preStart = document.getElementById('med-pre-start');
+  const active = document.getElementById('med-active');
+  const machineNamePre = document.getElementById('med-machine-name-pre');
+  if (preStart) preStart.classList.remove('hidden');
+  if (active) active.classList.add('hidden');
+  if (machineNamePre) machineNamePre.textContent = store.config.machine;
 
   const badge = document.getElementById('med-status-badge');
-  badge.textContent = 'Aguardando';
-  badge.className = 'badge';
+  if (badge) {
+    badge.textContent = 'Aguardando';
+    badge.className = 'badge';
+  }
 
-  document.getElementById('btn-start-measurement').addEventListener('click', () => {
-    const input = document.getElementById('initial-production-input');
-    const value = parseInt(input.value);
+  // Usa replaceWithClone para evitar acumular listeners duplicados quando
+  // o usuário navega para outra aba e volta sem iniciar a medição
+  replaceWithClone('btn-start-measurement', el => {
+    el.addEventListener('click', () => {
+      const input = document.getElementById('initial-production-input');
+      const value = parseInt(input.value);
 
-    // Validação: precisa informar um número válido
-    if (isNaN(value) || value < 0) {
-      input.style.borderColor = 'var(--red)';
-      input.focus();
-      vibrate([100, 50, 100]);
-      return;
-    }
+      // Validação: precisa informar um número válido
+      if (isNaN(value) || value < 0) {
+        input.style.borderColor = 'var(--red)';
+        input.focus();
+        vibrate([100, 50, 100]);
+        return;
+      }
 
-    // Inicia a medição com o valor de produção informado
-    store.startMeasurement(value);
-    vibrate([100]);
-    showActiveScreen();
+      // Inicia a medição com o valor de produção informado
+      store.startMeasurement(value);
+      vibrate([100]);
+      showActiveScreen();
+    });
   });
 }
 
 // Tela ativa: botões Marcha/Parada, contadores, botão finalizar
 function showActiveScreen() {
-  document.getElementById('med-pre-start').classList.add('hidden');
-  document.getElementById('med-active').classList.remove('hidden');
-  document.getElementById('med-machine-name').textContent = store.config.machine;
+  const preStart = document.getElementById('med-pre-start');
+  const active   = document.getElementById('med-active');
+
+  // Guard: se os elementos principais não existem, o HTML não foi carregado — aborta
+  if (!preStart || !active) {
+    console.error('showActiveScreen: elementos principais não encontrados no DOM');
+    return;
+  }
+
+  preStart.classList.add('hidden');
+  active.classList.remove('hidden');
+  const machineName = document.getElementById('med-machine-name');
+  if (machineName) machineName.textContent = store.config.machine;
 
   updateButtonStates();
   updateMedicao();
 
-  // Configura listeners dos botões principais
-  document.getElementById('btn-marcha').addEventListener('click', handleMarcha);
-  document.getElementById('btn-parada').addEventListener('click', handleParada);
-  document.getElementById('btn-confirm-production').addEventListener('click', handleConfirmProduction);
-  document.getElementById('btn-confirm-reason').addEventListener('click', handleConfirmReason);
-
-  // Botão "+" no modal de motivo: adiciona alarme personalizado
-  document.getElementById('btn-add-custom-reason').addEventListener('click', () => {
+  // Configura listeners usando clones para evitar duplicatas entre re-carregamentos
+  replaceWithClone('btn-marcha',           el => el.addEventListener('click', handleMarcha));
+  replaceWithClone('btn-parada',           el => el.addEventListener('click', handleParada));
+  replaceWithClone('btn-confirm-production', el => el.addEventListener('click', handleConfirmProduction));
+  replaceWithClone('btn-confirm-reason',   el => el.addEventListener('click', handleConfirmReason));
+  replaceWithClone('btn-finalize',         el => el.addEventListener('click', () => showFinalizeModal()));
+  replaceWithClone('btn-confirm-finalize', el => el.addEventListener('click', handleFinalize));
+  replaceWithClone('btn-cancel-finalize',  el => el.addEventListener('click', () => {
+    const modal = document.getElementById('modal-finalize');
+    if (modal) modal.classList.add('hidden');
+  }));
+  replaceWithClone('btn-add-custom-reason', el => el.addEventListener('click', () => {
     const input = document.getElementById('custom-reason-input');
     if (input.value.trim()) {
       store.addAlarm(input.value.trim(), 'Interna');
       input.value = '';
       renderAlarmList();
     }
-  });
-
-  // Modal de fim de turno: botão "Finalizar medição"
-  document.getElementById('btn-end-shift').addEventListener('click', () => {
+  }));
+  replaceWithClone('btn-end-shift', el => el.addEventListener('click', () => {
     store.markShiftEndPrompted();
-    document.getElementById('modal-shift-end').classList.add('hidden');
-    // Pequeno delay pra fechar um modal antes de abrir outro
+    const modal = document.getElementById('modal-shift-end');
+    if (modal) modal.classList.add('hidden');
     setTimeout(() => showFinalizeModal(), 300);
-  });
-
-  // Modal de fim de turno: botão "Estender turno" (define novo horário)
-  document.getElementById('btn-extend-shift').addEventListener('click', () => {
-    const newEnd = document.getElementById('new-shift-end-input').value;
-    if (newEnd) {
-      store.updateConfig({ shiftEnd: newEnd });
-      store.resetShiftEndPrompted(); // Permite que o alerta dispare novamente no novo horário
+  }));
+  replaceWithClone('btn-extend-shift', el => el.addEventListener('click', () => {
+    const input = document.getElementById('new-shift-end-input');
+    if (input && input.value) {
+      store.updateConfig({ shiftEnd: input.value });
+      store.resetShiftEndPrompted();
     }
-    document.getElementById('modal-shift-end').classList.add('hidden');
-  });
+    const modal = document.getElementById('modal-shift-end');
+    if (modal) modal.classList.add('hidden');
+  }));
+}
 
-  // Botão "Finalizar medição" na tela (sempre visível abaixo dos contadores)
-  document.getElementById('btn-finalize').addEventListener('click', () => showFinalizeModal());
-
-  // Modal de finalização: confirmar e cancelar
-  document.getElementById('btn-confirm-finalize').addEventListener('click', handleFinalize);
-  document.getElementById('btn-cancel-finalize').addEventListener('click', () => {
-    document.getElementById('modal-finalize').classList.add('hidden');
-  });
+// Substitui o elemento por um clone sem listeners, depois aplica o callback
+// Isso garante que não acumulem listeners duplicados se showActiveScreen for chamada mais de uma vez
+function replaceWithClone(id, applyListener) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const clone = el.cloneNode(true);
+  el.parentNode.replaceChild(clone, el);
+  applyListener(clone);
 }
 
 // Tela de medição finalizada (quando volta pra aba Medição após encerrar)
 function showFinishedScreen() {
-  document.getElementById('med-pre-start').classList.add('hidden');
-  document.getElementById('med-active').classList.remove('hidden');
-  document.getElementById('med-active').innerHTML = `
-    <div class="med-timer">
-      <span class="med-timer-label" style="color:var(--brand-light)">Medição finalizada</span>
-      <span class="med-timer-value">${formatTime(store.getElapsedMs())}</span>
-      <span class="med-timer-sub">${store.config.machine} — ${store.getDisplayProduction().toLocaleString('pt-BR')} unidades</span>
-    </div>
-    <div class="section-card" style="text-align:center;">
-      <p style="color:var(--text-muted);font-size:0.875rem;">Veja os resultados em <strong style="color:var(--brand-light)">Overview</strong> e exporte o JSON</p>
-    </div>
-  `;
+  const preStart = document.getElementById('med-pre-start');
+  const active = document.getElementById('med-active');
+  if (preStart) preStart.classList.add('hidden');
+  if (active) {
+    active.classList.remove('hidden');
+    active.innerHTML = `
+      <div class="med-timer">
+        <span class="med-timer-label" style="color:var(--brand-light)">Medição finalizada</span>
+        <span class="med-timer-value">${formatTime(store.getElapsedMs())}</span>
+        <span class="med-timer-sub">${store.config.machine} — ${store.getDisplayProduction().toLocaleString('pt-BR')} unidades</span>
+      </div>
+      <div class="section-card" style="text-align:center;">
+        <p style="color:var(--text-muted);font-size:0.875rem;">Veja os resultados em <strong style="color:var(--brand-light)">Overview</strong> e exporte o JSON</p>
+      </div>
+    `;
+  }
   const badge = document.getElementById('med-status-badge');
-  badge.textContent = 'Finalizada';
-  badge.className = 'badge';
+  if (badge) {
+    badge.textContent = 'Finalizada';
+    badge.className = 'badge';
+  }
 }
 
 // ============================================================
@@ -181,8 +210,16 @@ function handleParada() {
 // Retorna uma Promise que resolve com o motivo selecionado
 function showStopReasonModal() {
   return new Promise(resolve => {
+    const modal = document.getElementById('modal-stop-reason');
+    // Guard: se o modal não existe no DOM (ex: página foi trocada durante navegação),
+    // resolve imediatamente com "Não informado" sem travar a Promise
+    if (!modal) {
+      resolve('Não informado');
+      return;
+    }
+
     renderAlarmList();
-    document.getElementById('modal-stop-reason').classList.remove('hidden');
+    modal.classList.remove('hidden');
     // Limpa seleção anterior
     document.querySelectorAll('#alarm-list-modal .alarm-item').forEach(el => el.classList.remove('selected'));
 
@@ -236,8 +273,9 @@ function handleConfirmReason() {
     store.addAlarm(customInput.value.trim(), 'Interna');
   }
 
-  customInput.value = '';
-  document.getElementById('modal-stop-reason').classList.add('hidden');
+  if (customInput) customInput.value = '';
+  const modal = document.getElementById('modal-stop-reason');
+  if (modal) modal.classList.add('hidden');
 
   // Resolve a Promise do showStopReasonModal
   if (window._pendingReasonResolve) {
@@ -265,9 +303,12 @@ function handleConfirmProduction() {
   }
 
   store.addProductionReading(value);
-  input.value = '';
-  input.style.borderColor = '';
-  document.getElementById('modal-production').classList.add('hidden');
+  if (input) {
+    input.value = '';
+    input.style.borderColor = '';
+  }
+  const modal = document.getElementById('modal-production');
+  if (modal) modal.classList.add('hidden');
   vibrate([50]);
 }
 
@@ -282,6 +323,8 @@ function updateButtonStates() {
   const paradaBtn = document.getElementById('btn-parada');
   const stateLabel = document.getElementById('med-state-label');
   const badge = document.getElementById('med-status-badge');
+
+  if (!marchaBtn || !paradaBtn || !stateLabel || !badge) return;
 
   if (m.state === 'running') {
     marchaBtn.classList.add('active');    // Botão verde fica destacado
@@ -315,15 +358,23 @@ export function updateMedicao() {
 
   // Atualiza display dos contadores
   timerEl.textContent = formatTime(store.getElapsedMs());
-  document.getElementById('med-stop-count').textContent = store.getStops().length;
-  document.getElementById('med-stop-time').textContent = formatTimeMM(store.getStoppedMs());
-  document.getElementById('med-production').textContent = store.getDisplayProduction().toLocaleString('pt-BR');
+  
+  const stopCountEl = document.getElementById('med-stop-count');
+  if (stopCountEl) stopCountEl.textContent = store.getStops().length;
+
+  const stopTimeEl = document.getElementById('med-stop-time');
+  if (stopTimeEl) stopTimeEl.textContent = formatTimeMM(store.getStoppedMs());
+
+  const prodEl = document.getElementById('med-production');
+  if (prodEl) prodEl.textContent = store.getDisplayProduction().toLocaleString('pt-BR');
 
   // Timer da parada atual (fica vermelho quando parado)
   const currentStopMs = store.getCurrentStopMs();
   const currentStopEl = document.getElementById('med-current-stop');
-  currentStopEl.textContent = formatTimeMM(currentStopMs);
-  currentStopEl.style.color = currentStopMs > 0 ? 'var(--red)' : 'var(--text)';
+  if (currentStopEl) {
+    currentStopEl.textContent = formatTimeMM(currentStopMs);
+    currentStopEl.style.color = currentStopMs > 0 ? 'var(--red)' : 'var(--text)';
+  }
 
   // Verifica se é hora de pedir leitura de produção
   if (store.shouldPromptProduction()) {
@@ -333,14 +384,16 @@ export function updateMedicao() {
     const lastReading = store.getLastReading();
     const input = document.getElementById('production-input');
     if (input) input.placeholder = lastReading ? `Última: ${lastReading.value}` : 'Ex: 4500';
-    document.getElementById('modal-production').classList.remove('hidden');
+    const modal = document.getElementById('modal-production');
+    if (modal) modal.classList.remove('hidden');
   }
 
   // Verifica se atingiu o horário de fim do turno
   if (store.shouldPromptShiftEnd()) {
     vibrate([500, 200, 500]); // Vibração forte pra fim de turno
     store.markShiftEndPrompted();
-    document.getElementById('modal-shift-end').classList.remove('hidden');
+    const shiftEndModal = document.getElementById('modal-shift-end');
+    if (shiftEndModal) shiftEndModal.classList.remove('hidden');
   }
 }
 
@@ -355,7 +408,8 @@ function showFinalizeModal() {
   if (input && lastReading) {
     input.placeholder = `Última leitura: ${lastReading.value}`;
   }
-  document.getElementById('modal-finalize').classList.remove('hidden');
+  const modal = document.getElementById('modal-finalize');
+  if (modal) modal.classList.remove('hidden');
 }
 
 // Confirma a finalização da medição
@@ -374,7 +428,8 @@ function handleFinalize() {
   store.finalizeMeasurement();
   vibrate([200]);
 
-  document.getElementById('modal-finalize').classList.add('hidden');
+  const modal = document.getElementById('modal-finalize');
+  if (modal) modal.classList.add('hidden');
 
   // Substitui conteúdo da tela por mensagem de "finalizada"
   showFinishedScreen();

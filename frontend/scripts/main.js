@@ -31,9 +31,15 @@ async function loadPage(name) {
   navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.page === name));
 
   try {
-    // Carrega o HTML da página da pasta /pages/
-    const resp = await fetch(`pages/${name}.html`);
+     // Carrega o HTML da página com cache desativado (vital para o Live Server)
+    const resp = await fetch(`pages/${name}.html`, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} - Falha ao carregar página`);
+
     const html = await resp.text();
+
+    // Guard: se outra navegação ocorreu enquanto o fetch estava pendente, ignora
+    if (currentPage !== name) return;
+
     container.innerHTML = html;
 
     // Chama a função de inicialização da página carregada
@@ -44,6 +50,8 @@ async function loadPage(name) {
       case 'config': initConfig(); break;
     }
   } catch (e) {
+    if (currentPage !== name) return; // Navegação foi cancelada
+    console.error('Erro ao carregar página:', e);
     container.innerHTML = `<div class="empty-state"><p>Erro ao carregar página</p></div>`;
   }
 }

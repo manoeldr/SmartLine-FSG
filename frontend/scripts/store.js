@@ -45,6 +45,53 @@ const defaultData = () => ({
   },
 });
 
+// ============================================================
+// API.JS — Camada de comunicação com o backend
+// ============================================================
+
+const API_URL = `http://${window.location.hostname}:8000`;
+
+const api = {
+  async criarMedicao(config, producaoInicial) {
+    try {
+      const r = await fetch(`${API_URL}/medicoes/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente: config.client,
+          maquina: config.machine,
+          turno_inicio: config.shiftStart,
+          turno_fim: config.shiftEnd,
+          velocidade_nominal: config.speed,
+          producao_inicial: producaoInicial,
+        }),
+      });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  },
+
+  async registrarEvento(medicaoId, tipo, motivo = null, producaoLeitura = null) {
+    try {
+      await fetch(`${API_URL}/medicoes/${medicaoId}/eventos/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo, motivo, producao_leitura: producaoLeitura }),
+      });
+    } catch { /* falha silenciosa — não quebra o front */ }
+  },
+
+  async finalizarMedicao(medicaoId, producaoFinal) {
+    try {
+      await fetch(`${API_URL}/medicoes/${medicaoId}/finalizar`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ producao_final: producaoFinal }),
+      });
+    } catch { /* falha silenciosa */ }
+  },
+};
+
 export const store = {
   _data: null, // Objeto de dados em memória
 
@@ -133,7 +180,16 @@ export const store = {
     m.initialProduction = initialProduction;
     m.productionReadings = [{ time: new Date().toISOString(), value: initialProduction }];
     m.lastProductionPrompt = Date.now();
+    m.medicaoId = null;
     this.save();
+
+    //Salva no backend 
+       api.criarMedicao(this._data.config, initialProduction).then(resultado => {
+      if (resultado?.id) {
+        this._data.measurement.medicaoId = resultado.id;
+        this.save();
+      }
+    });
   },
 
   // Muda estado para "rodando" IMEDIATAMENTE ao clicar Marcha.
@@ -146,6 +202,8 @@ export const store = {
     m.state = 'running';
     m.events.push({ type: 'marcha', time: new Date().toISOString() });
     this.save();
+
+    if (m.medicaoId) api.registrarEvento(m.medicaoId, 'marcha');
   },
 
   // Registra o motivo da última parada (chamado após o modal de motivo)
@@ -173,6 +231,8 @@ export const store = {
     m.state = 'stopped';
     m.events.push({ type: 'stop', time: new Date().toISOString(), reason: null, category: null });
     this.save();
+
+    if (m.medicaoId) api.registrarEvento(m.medicaoId, 'parada');
   },
 
   // ============================================================
@@ -347,6 +407,11 @@ export const store = {
     m.endTime = new Date().toISOString();
     m.events.push({ type: 'end', time: new Date().toISOString() });
     this.save();
+
+    if (m.medicaoId) {
+      const producaoFinal = this.getDisplayProduction();
+      api.finalizarMedicao(m.medicaoId, producaoFinal);
+    }
   },
 
   // Exporta todos os dados como JSON formatado (pra download)

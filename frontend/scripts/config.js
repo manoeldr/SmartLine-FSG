@@ -11,18 +11,26 @@ export function initConfig() {
   const cfg = store.config;
 
   // Preenche campos do formulário
-  document.getElementById('cfg-client').value = cfg.client || '';
-  document.getElementById('cfg-machine').value = cfg.machine || '';
-  document.getElementById('cfg-speed').value = cfg.speed || '';
-  document.getElementById('cfg-shift-start').value = cfg.shiftStart || '08:00';
-  document.getElementById('cfg-shift-end').value = cfg.shiftEnd || '17:00';
-  document.getElementById('cfg-prod-interval').value = cfg.productionInterval || 30;
+  const elClient = document.getElementById('cfg-client');
+  if (elClient) elClient.value = cfg.client || '';
+  const elMachine = document.getElementById('cfg-machine');
+  if (elMachine) elMachine.value = cfg.machine || '';
+  const elSpeed = document.getElementById('cfg-speed');
+  if (elSpeed) elSpeed.value = cfg.speed || '';
+  const elShiftStart = document.getElementById('cfg-shift-start');
+  if (elShiftStart) elShiftStart.value = cfg.shiftStart || '08:00';
+  const elShiftEnd = document.getElementById('cfg-shift-end');
+  if (elShiftEnd) elShiftEnd.value = cfg.shiftEnd || '17:00';
+  const elProdInterval = document.getElementById('cfg-prod-interval');
+  if (elProdInterval) elProdInterval.value = cfg.productionInterval || 30;
 
   // Popula dropdown de categorias de alarme
   const catSelect = document.getElementById('cfg-new-alarm-cat');
-  catSelect.innerHTML = (cfg.alarmCategories || ['Interna', 'Externa']).map(c =>
-    `<option value="${c}">${c}</option>`
-  ).join('');
+  if (catSelect) {
+    catSelect.innerHTML = (cfg.alarmCategories || ['Interna', 'Externa']).map(c =>
+      `<option value="${c}">${c}</option>`
+    ).join('');
+  }
 
   // ============================================================
   // TOGGLE DE TEMA (claro/escuro)
@@ -32,23 +40,25 @@ export function initConfig() {
   const themeLabel = document.getElementById('cfg-theme-label');
   const currentTheme = store.getTheme();
 
-  // Sincroniza visual do toggle com o tema salvo
-  if (currentTheme === 'light') {
-    themeToggle.classList.add('active');
-    themeLabel.textContent = 'Claro';
-  } else {
-    themeToggle.classList.remove('active');
-    themeLabel.textContent = 'Escuro';
-  }
+  if (themeToggle && themeLabel) {
+    // Sincroniza visual do toggle com o tema salvo
+    if (currentTheme === 'light') {
+      themeToggle.classList.add('active');
+      themeLabel.textContent = 'Claro';
+    } else {
+      themeToggle.classList.remove('active');
+      themeLabel.textContent = 'Escuro';
+    }
 
-  // Ao clicar, alterna entre dark e light
-  themeToggle.addEventListener('click', () => {
-    const isLight = themeToggle.classList.contains('active');
-    const newTheme = isLight ? 'dark' : 'light';
-    store.setTheme(newTheme); // Salva e aplica imediatamente no DOM
-    themeToggle.classList.toggle('active');
-    themeLabel.textContent = newTheme === 'light' ? 'Claro' : 'Escuro';
-  });
+    // Ao clicar, alterna entre dark e light
+    themeToggle.addEventListener('click', () => {
+      const isLight = themeToggle.classList.contains('active');
+      const newTheme = isLight ? 'dark' : 'light';
+      store.setTheme(newTheme); // Salva e aplica imediatamente no DOM
+      themeToggle.classList.toggle('active');
+      themeLabel.textContent = newTheme === 'light' ? 'Claro' : 'Escuro';
+    });
+  }
 
   // ============================================================
   // LISTA DE ALARMES
@@ -57,54 +67,73 @@ export function initConfig() {
   renderAlarms();
 
   // Adicionar novo alarme com categoria selecionada
-  document.getElementById('cfg-add-alarm').addEventListener('click', () => {
-    const nameInput = document.getElementById('cfg-new-alarm');
-    const catSelect = document.getElementById('cfg-new-alarm-cat');
-    if (nameInput.value.trim()) {
-      store.addAlarm(nameInput.value.trim(), catSelect.value);
-      nameInput.value = '';
-      renderAlarms();
-    }
-  });
+  const btnAddAlarm = document.getElementById('cfg-add-alarm');
+  if (btnAddAlarm) {
+    btnAddAlarm.addEventListener('click', () => {
+      const nameInput = document.getElementById('cfg-new-alarm');
+      const catSelect = document.getElementById('cfg-new-alarm-cat');
+      if (nameInput && nameInput.value.trim()) {
+        store.addAlarm(nameInput.value.trim(), catSelect ? catSelect.value : 'Interna');
+        nameInput.value = '';
+        renderAlarms();
+      }
+    });
+  }
 
   // Enter no campo de alarme dispara o botão +
-  document.getElementById('cfg-new-alarm').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cfg-add-alarm').click(); }
-  });
+  const inputNewAlarm = document.getElementById('cfg-new-alarm');
+  if (inputNewAlarm) {
+    inputNewAlarm.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const btnAdd = document.getElementById('cfg-add-alarm');
+        if (btnAdd) btnAdd.click();
+      }
+    });
+  }
 
   // ============================================================
   // SALVAR CONFIGURAÇÃO
   // ============================================================
 
-  document.getElementById('cfg-save-btn').addEventListener('click', () => {
-    store.updateConfig({
-      client: document.getElementById('cfg-client').value.trim(),
-      machine: document.getElementById('cfg-machine').value.trim(),
-      speed: parseInt(document.getElementById('cfg-speed').value) || 0,
-      shiftStart: document.getElementById('cfg-shift-start').value,
-      shiftEnd: document.getElementById('cfg-shift-end').value,
-      productionInterval: parseInt(document.getElementById('cfg-prod-interval').value) || 30,
+  const btnSave = document.getElementById('cfg-save-btn');
+  if (btnSave) {
+    btnSave.addEventListener('click', () => {
+      const client = document.getElementById('cfg-client')?.value.trim();
+      const machine = document.getElementById('cfg-machine')?.value.trim();
+      const speed = parseInt(document.getElementById('cfg-speed')?.value) || 0;
+      const shiftStart = document.getElementById('cfg-shift-start')?.value;
+      const shiftEnd = document.getElementById('cfg-shift-end')?.value;
+      const productionInterval = parseInt(document.getElementById('cfg-prod-interval')?.value) || 30;
+
+      store.updateConfig({
+        client, machine, speed, shiftStart, shiftEnd, productionInterval
+      });
+      showToast('Configuração salva');
     });
-    showToast('Configuração salva');
-  });
+  }
 
   // ============================================================
   // RESETAR MEDIÇÃO (zona de perigo)
   // ============================================================
 
-  document.getElementById('cfg-reset-btn').addEventListener('click', () => {
-    if (confirm('Tem certeza? Todos os dados da medição atual serão apagados.')) {
-      store.resetMeasurement();
-      showToast('Medição resetada');
-    }
-  });
+  const resetBtn = document.getElementById('cfg-reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('Tem certeza? Todos os dados da medição atual serão apagados.')) {
+        store.resetMeasurement();
+        showToast('Medição resetada');
+      }
+    });
+  }
 }
 
 // Renderiza a lista de alarmes agrupados por categoria
 // Cada alarme tem um botão × pra remover
 function renderAlarms() {
   const list = document.getElementById('cfg-alarm-list');
-  const alarms = store.config.alarms;
+  if (!list) return;
+  const alarms = store.config.alarms || [];
 
   // Agrupa por categoria mantendo o índice original (necessário pro delete)
   const grouped = {};

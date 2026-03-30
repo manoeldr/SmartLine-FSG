@@ -1,7 +1,8 @@
 // ============================================================
 // OVERVIEW.JS — Tela de overview (visão geral da medição)
 // Mostra KPIs, barra de tempo rodando/parado, gráfico de pizza
-// por categoria de alarme, indicadores MTBF/MTTR e botão de export.
+// por categoria de alarme, indicadores MTBF/MTTR, gráfico de
+// produção real vs nominal e botão de export.
 // ============================================================
 
 import { store } from './store.js';
@@ -10,12 +11,18 @@ import { formatTime, formatTimeMM, formatPercent } from './utils.js';
 // Cores do gráfico de pizza — uma cor por categoria
 const PIE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6', '#ec4899'];
 
+// Instância do gráfico de produção (Chart.js)
+let productionChart = null;
+
 // Inicializa a tela de overview
 export function initOverview() {
   const m = store.measurement;
   const noData = document.getElementById('ov-no-data');
   const content = document.getElementById('ov-content');
   const badge = document.getElementById('ov-status-badge');
+
+  // Reseta o chart ao recarregar a página
+  productionChart = null;
 
   // Se não tem medição (nem ativa nem finalizada), mostra estado vazio
   if (!m.active && m.state !== 'finished') {
@@ -52,7 +59,6 @@ export function initOverview() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      // Nome do arquivo: auditoria_NomeCliente_2026-03-25.json
       a.download = `auditoria_${store.config.client || 'export'}_${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
@@ -67,36 +73,33 @@ export function updateOverview() {
   const m = store.measurement;
   if (!m.active && m.state !== 'finished') return;
 
-  // Coleta dados calculados do store
-  const elapsed = store.getElapsedMs();   // Tempo total de medição
-  const running = store.getRunningMs();   // Tempo rodando
-  const stopped = store.getStoppedMs();   // Tempo parado
-  const stops = store.getStops();         // Lista de paradas
-  const speed = store.config.speed || 1;  // Velocidade nominal da máquina
-  const displayProd = store.getDisplayProduction(); // Valor exibido (último informado)
-  const oeeProd = store.getProductionForOEE();      // Valor pra cálculo (última - inicial)
+  const elapsed = store.getElapsedMs();
+  const running = store.getRunningMs();
+  const stopped = store.getStoppedMs();
+  const stops = store.getStops();
+  const speed = store.config.speed || 1;
+  const displayProd = store.getDisplayProduction();
+  const oeeProd = store.getProductionForOEE();
 
   // KPIs principais
   document.getElementById('ov-elapsed').textContent = formatTime(elapsed);
   document.getElementById('ov-production').textContent = displayProd.toLocaleString('pt-BR');
 
-  // Disponibilidade = tempo rodando / tempo total (em %)
+  // Disponibilidade
   const availability = elapsed > 0 ? (running / elapsed) * 100 : 0;
 
-  // Performance = produção real do período / produção esperada (em %)
-  // Usa oeeProd (subtração) pra calcular, não o valor exibido
+  // Performance
   const runningHours = running / 3600000;
   const expectedOutput = runningHours * speed;
   const performance = expectedOutput > 0 ? (oeeProd / expectedOutput) * 100 : 0;
 
-  // OEE = Disponibilidade × Performance × Qualidade
-  // Qualidade assumida como 100% (não medimos refugo neste app)
+  // OEE
   const oee = (availability / 100) * (Math.min(performance, 100) / 100) * 100;
 
   document.getElementById('ov-efficiency').textContent = formatPercent(availability);
   document.getElementById('ov-oee').textContent = formatPercent(oee);
 
-  // Barra visual de tempo (verde = rodando, vermelho = parado)
+  // Barra de tempo
   const runPct = elapsed > 0 ? (running / elapsed) * 100 : 100;
   const stopPct = elapsed > 0 ? (stopped / elapsed) * 100 : 0;
   document.getElementById('ov-bar-running').style.width = `${runPct}%`;
@@ -108,9 +111,7 @@ export function updateOverview() {
   document.getElementById('ov-total-stops').textContent = stops.length;
 
   if (stops.length > 0) {
-    // MTBF = Tempo médio entre falhas (tempo rodando / número de paradas)
     const mtbf = running / stops.length;
-    // MTTR = Tempo médio de reparo (tempo parado / número de paradas)
     const avgStopMs = stopped / stops.length;
     document.getElementById('ov-mtbf').textContent = formatTimeMM(mtbf);
     document.getElementById('ov-mttr').textContent = formatTimeMM(avgStopMs);
@@ -122,13 +123,13 @@ export function updateOverview() {
   document.getElementById('ov-availability').textContent = formatPercent(availability);
   document.getElementById('ov-performance').textContent = formatPercent(Math.min(performance, 100));
 
-  // Gráfico de pizza (paradas por categoria)
+  // Gráficos
   renderPieChart();
+  renderProductionChart();
 }
 
 // ============================================================
 // GRÁFICO DE PIZZA (DONUT) — Paradas por categoria
-// Desenha diretamente no canvas usando Canvas API
 // ============================================================
 
 function renderPieChart() {
@@ -140,7 +141,6 @@ function renderPieChart() {
   const byCategory = store.getStopsByCategory();
   const entries = Object.entries(byCategory);
 
-  // Se não tem paradas, esconde o gráfico
   if (entries.length === 0) {
     canvas.style.display = 'none';
     legend.innerHTML = '';
@@ -153,11 +153,10 @@ function renderPieChart() {
 
   const ctx = canvas.getContext('2d');
   const total = entries.reduce((s, [, v]) => s + v.totalMs, 0);
-  const cx = 100, cy = 100, r = 80; // Centro e raio do gráfico
+  const cx = 100, cy = 100, r = 80;
 
   ctx.clearRect(0, 0, 200, 200);
 
-  // Desenha as fatias do pizza a partir do topo (-90°)
   let startAngle = -Math.PI / 2;
   entries.forEach(([cat, data], i) => {
     const sliceAngle = (data.totalMs / total) * Math.PI * 2;
@@ -170,27 +169,22 @@ function renderPieChart() {
     startAngle += sliceAngle;
   });
 
-  // Furo central (transforma pizza em donut)
   ctx.beginPath();
   ctx.arc(cx, cy, 45, 0, Math.PI * 2);
-  // Pega cor de fundo do tema atual pra preencher o furo
   const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim();
   ctx.fillStyle = bgColor || '#111827';
   ctx.fill();
 
-  // Número total de paradas no centro do donut
   ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#f1f5f9';
   ctx.font = 'bold 20px -apple-system, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(entries.reduce((s, [, v]) => s + v.count, 0), cx, cy - 6);
 
-  // Label "paradas" abaixo do número
   ctx.font = '10px -apple-system, sans-serif';
   ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#64748b';
   ctx.fillText('paradas', cx, cy + 12);
 
-  // Legenda ao lado do gráfico
   legend.innerHTML = entries.map(([cat, data], i) => {
     const pct = Math.round((data.totalMs / total) * 100);
     const mins = Math.floor(data.totalMs / 60000);
@@ -200,4 +194,109 @@ function renderPieChart() {
       <span class="pie-legend-value">${data.count}x — ${mins}min (${pct}%)</span>
     </div>`;
   }).join('');
+}
+
+// ============================================================
+// GRÁFICO DE LINHA — Produção real vs nominal (Chart.js)
+// ============================================================
+
+function renderProductionChart() {
+  const canvas = document.getElementById('ov-production-chart');
+  if (!canvas) return;
+
+  const m = store.measurement;
+  const readings = m.productionReadings || [];
+  if (readings.length === 0) return;
+
+  const speed = store.config.speed || 0;
+  const startTime = new Date(m.startTime).getTime();
+
+  // Dados reais — subtrai produção inicial pra mostrar só o que foi produzido na medição
+  const realValues = readings.map(r => r.value - (m.initialProduction || 0));
+
+  // Linha nominal — produção esperada no mesmo intervalo de tempo
+  const nominalValues = readings.map(r => {
+    const elapsedMin = (new Date(r.time).getTime() - startTime) / 60000;
+    return Math.round((speed / 60) * elapsedMin);
+  });
+
+  // Labels do eixo X em minutos
+  const labels = readings.map(r => {
+    const min = Math.round((new Date(r.time).getTime() - startTime) / 60000);
+    return `${min}min`;
+  });
+
+  // Se o chart já existe, apenas atualiza os dados
+  if (productionChart) {
+    productionChart.data.labels = labels;
+    productionChart.data.datasets[0].data = realValues;
+    productionChart.data.datasets[1].data = nominalValues;
+    productionChart.update('none'); // 'none' desativa animação na atualização
+    return;
+  }
+
+  // Cria o chart pela primeira vez
+  productionChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Real',
+          data: realValues,
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,0.1)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          pointBackgroundColor: '#3b82f6',
+        },
+        {
+          label: 'Nominal',
+          data: nominalValues,
+          borderColor: '#22c55e',
+          borderDash: [6, 3],
+          backgroundColor: 'transparent',
+          fill: false,
+          tension: 0,
+          pointRadius: 0,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#94a3b8',
+            font: { size: 12 },
+            usePointStyle: true,
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('pt-BR')} un`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+          grid: { color: 'rgba(148,163,184,0.08)' }
+        },
+        y: {
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+          grid: { color: 'rgba(148,163,184,0.08)' },
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'unidades',
+            color: '#64748b',
+            font: { size: 11 }
+          }
+        }
+      }
+    }
+  });
 }
