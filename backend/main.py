@@ -5,6 +5,7 @@ from backend.routes.medicoes import router as medicoes_router
 from backend.routes.eventos import router as eventos_router
 from backend.routes.clientes import router as clientes_router
 from backend.routes.linhas import router as linhas_router
+from backend.routes.maquinas_linha import router as maquinas_router
 import backend.models.medicao
 import backend.models.evento
 import backend.models.cliente
@@ -27,6 +28,7 @@ app.include_router(medicoes_router)
 app.include_router(eventos_router)
 app.include_router(clientes_router)
 app.include_router(linhas_router)
+app.include_router(maquinas_router)
 
 @app.get("/")
 def root():
