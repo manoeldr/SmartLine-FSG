@@ -1,12 +1,7 @@
-from __future__ import annotations
 from datetime import datetime
-from typing import TYPE_CHECKING
-from sqlalchemy import String, Integer, Float, DateTime
+from sqlalchemy import String, Integer, Float, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
-
-if TYPE_CHECKING:
-    from backend.models.evento import Evento
 
 class Medicao(Base):
     __tablename__ = "medicoes"
@@ -21,5 +16,7 @@ class Medicao(Base):
     producao_final: Mapped[int | None] = mapped_column(Integer, nullable=True)
     timestamp_inicio: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     timestamp_fim: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    maquina_linha_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("maquinas_linha.id"), nullable=True)
 
-    eventos: Mapped[list[Evento]] = relationship("Evento", back_populates="medicao")
+    eventos: Mapped[list["Evento"]] = relationship("Evento", back_populates="medicao")
+    maquina_linha: Mapped["MaquinaLinha"] = relationship("MaquinaLinha", back_populates="medicoes")

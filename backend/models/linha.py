@@ -10,3 +10,4 @@ class Linha(Base):
     cliente_id: Mapped[int] = mapped_column(Integer, ForeignKey("clientes.id"))
 
     cliente: Mapped["Cliente"] = relationship("Cliente", back_populates="linhas")
+    maquinas: Mapped[list["MaquinaLinha"]] = relationship("MaquinaLinha", back_populates="linha", order_by="MaquinaLinha.ordem")

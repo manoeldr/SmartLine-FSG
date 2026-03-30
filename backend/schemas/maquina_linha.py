@@ -16,3 +16,4 @@ class MaquinaLinhaResponse(BaseModel):
     linha_id: int
 
     model_config = {"from_attributes": True}
+    
