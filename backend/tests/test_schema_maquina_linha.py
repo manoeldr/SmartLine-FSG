@@ -1,5 +1,5 @@
 import pytest
-from backend.models.maquina_linha import MaquinaLinhaCreate, MaquinaLinhaUpdate, MaquinaLinhaResponse
+from backend.schemas.maquina_linha import MaquinaLinhaCreate, MaquinaLinhaUpdate, MaquinaLinhaResponse
 
 def test_maquina_linha_create_valido():
     m = MaquinaLinhaCreate(nome="Enchedora", ordem=2, linha_id=1)
