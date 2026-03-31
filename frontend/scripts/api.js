@@ -55,6 +55,10 @@ export const api = {
     return request('DELETE', `/linhas/${linhaId}/maquinas/${maquinaId}`);
   },
 
+  async atualizarMaquina(linhaId, maquinaId, dados) {
+    return request('PATCH', `/linhas/${linhaId}/maquinas/${maquinaId}`, dados);
+  },
+  
   // ── Medições ─────────────────────────────────────────────
   async criarMedicao(dados) {
     return request('POST', '/medicoes/', dados);

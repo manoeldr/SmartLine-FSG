@@ -16,17 +16,16 @@ let estadoConfig = {
 
 export function initConfig() {
   setTimeout(() => {
-    carregarClientes();
-    preencherConfigMedicao();
-    configurarTema();
-    configurarAlarmes();
-    configurarBotaoSalvar();
-    configurarBotaoReset();
+    configurarSelectCliente();
+    configurarSelectLinha();
     configurarBotaoAdicionarCliente();
     configurarBotaoAdicionarLinha();
     configurarBotaoAdicionarMaquina();
-    configurarSelectCliente();
-    configurarSelectLinha();
+    configurarBotaoSalvar();
+    configurarBotaoReset();
+    configurarTema();
+    configurarAlarmes();
+    preencherConfigMedicao();
     carregarClientes();
   }, 50);
 }
@@ -74,6 +73,8 @@ function configurarSelectCliente() {
     estadoConfig.clienteId = select.value || null;
     estadoConfig.linhaId = null;
     estadoConfig.maquinaId = null;
+    // Limpa IDs salvos no store para não restaurar linha/máquina do cliente anterior
+    store.updateConfig({ linhaId: null, maquinaId: null });
     limparLinhas();
     limparMaquinas();
     if (estadoConfig.clienteId) await carregarLinhas(estadoConfig.clienteId);
@@ -184,6 +185,7 @@ function limparLinhas() {
   const section = document.getElementById('cfg-linha-section');
   select.innerHTML = '<option value="">Selecione uma linha...</option>';
   section.classList.add('hidden');
+  limparMaquinas();
 }
 
 // ============================================================
@@ -235,14 +237,17 @@ function renderMaquinas() {
     list.innerHTML = '<p class="empty-hint">Nenhuma máquina cadastrada ainda</p>';
     return;
   }
+
   list.innerHTML = estadoConfig.maquinas.map((m) => `
-    <div class="maquina-item">
+    <div class="maquina-item" draggable="true" data-id="${m.id}">
+      <span class="drag-handle">⠿</span>
       <span class="maquina-ordem">${m.ordem}</span>
       <span class="maquina-nome">${m.nome}</span>
       <button type="button" class="btn-icon remove-maquina" data-id="${m.id}">×</button>
     </div>
   `).join('');
 
+  // Listeners de remoção
   list.querySelectorAll('.remove-maquina').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -255,6 +260,64 @@ function renderMaquinas() {
         showToast('Máquina removida');
       } catch {
         showToast('Erro ao remover máquina', 'erro');
+      }
+    });
+  });
+
+  // Drag and drop
+  let dragging = null;
+
+  list.querySelectorAll('.maquina-item').forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      dragging = item;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    item.addEventListener('dragend', async (e) => {
+      e.stopPropagation();
+      item.classList.remove('dragging');
+      dragging = null;
+
+      const items = [...list.querySelectorAll('.maquina-item')];
+      const novaOrdem = items.map((el, i) => ({
+        id: parseInt(el.dataset.id),
+        ordem: i + 1,
+      }));
+
+      // Atualiza localmente
+      novaOrdem.forEach(({ id, ordem }) => {
+        const m = estadoConfig.maquinas.find(m => m.id === id);
+        if (m) m.ordem = ordem;
+      });
+      estadoConfig.maquinas.sort((a, b) => a.ordem - b.ordem);
+
+      // Salva no backend
+      try {
+        await Promise.all(
+          novaOrdem.map(({ id, ordem }) =>
+            api.atualizarMaquina(estadoConfig.linhaId, id, { ordem })
+          )
+        );
+        renderMaquinas();
+        renderSelectMinhaMaquina();
+        showToast('Ordem salva');
+      } catch (err) {
+        console.error('Erro ao salvar ordem:', err);
+        showToast('Erro ao salvar nova ordem', 'erro');
+      }
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (dragging && dragging !== item) {
+        const rect = item.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (e.clientY < mid) {
+          list.insertBefore(dragging, item);
+        } else {
+          list.insertBefore(dragging, item.nextSibling);
+        }
       }
     });
   });
@@ -288,9 +351,16 @@ function renderSelectMinhaMaquina() {
 
 function limparMaquinas() {
   estadoConfig.maquinas = [];
+  estadoConfig.maquinaId = null;
+
   const section = document.getElementById('cfg-maquinas-section');
+  const minhaMaquinaSection = document.getElementById('cfg-minha-maquina-section');
+  const list = document.getElementById('cfg-maquinas-list');
+
   section.classList.add('hidden');
-  document.getElementById('cfg-minha-maquina-section').classList.add('hidden');
+  minhaMaquinaSection.classList.add('hidden');
+
+  if (list) list.innerHTML = '';
 }
 
 // ============================================================

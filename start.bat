@@ -5,13 +5,13 @@ echo Iniciando SmartLine...
 echo.
 
 :: Ativa o venv e sobe o backend na porta 5000
-start "Backend - SmartLine API" cmd /k "cd /d "%~dp0" && venv\Scripts\activate && python -m uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload"
+start "Backend - SmartLine API" cmd /c "title Backend - SmartLine API && cd /d "%~dp0" && venv\Scripts\activate && python -m uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload || pause"
 
 :: Aguarda 2 segundos para o backend subir antes do frontend
 timeout /t 2 /nobreak > nul
 
 :: Sobe o frontend na porta 5500
-start "Frontend - SmartLine UI" cmd /k "cd /d "%~dp0" && python -m http.server 5500 --directory frontend"
+start "Frontend - SmartLine UI" cmd /c "title Frontend - SmartLine UI && cd /d "%~dp0" && python -m http.server 5500 --directory frontend || pause"
 
 :: Aguarda mais 2 segundos e abre o browser
 timeout /t 2 /nobreak > nul
