@@ -1,6 +1,6 @@
 // ============================================================
 // CONFIG.JS — Tela de configuração
-// Seções: Cliente, Linha, Fluxo da linha, Minha máquina,
+// Seções: Cliente, Linha, Fluxo da linha,
 // Configuração da medição (turno, velocidade, alarmes)
 // ============================================================
 
@@ -10,7 +10,6 @@ import { api } from './api.js';
 let estadoConfig = {
   clienteId: null,
   linhaId: null,
-  maquinaId: null,
   maquinas: [],
 };
 
@@ -72,8 +71,6 @@ function configurarSelectCliente() {
   select.addEventListener('change', async () => {
     estadoConfig.clienteId = select.value || null;
     estadoConfig.linhaId = null;
-    estadoConfig.maquinaId = null;
-    // Limpa IDs salvos no store para não restaurar linha/máquina do cliente anterior
     store.updateConfig({ linhaId: null, maquinaId: null });
     limparLinhas();
     limparMaquinas();
@@ -146,7 +143,7 @@ function configurarSelectLinha() {
   select.dataset.listenerAdded = 'true';
   select.addEventListener('change', async () => {
     estadoConfig.linhaId = select.value || null;
-    estadoConfig.maquinaId = null;
+    store.updateConfig({ maquinaId: null });
     limparMaquinas();
     if (estadoConfig.linhaId) await carregarMaquinas(estadoConfig.linhaId);
   });
@@ -203,7 +200,6 @@ async function carregarMaquinas(linhaId) {
   }
 
   renderMaquinas();
-  renderSelectMinhaMaquina();
 }
 
 function configurarBotaoAdicionarMaquina() {
@@ -222,7 +218,6 @@ function configurarBotaoAdicionarMaquina() {
       const criada = await api.criarMaquina(estadoConfig.linhaId, nome, ordem);
       estadoConfig.maquinas.push(criada);
       renderMaquinas();
-      renderSelectMinhaMaquina();
       input.value = '';
       showToast('Máquina adicionada');
     } catch (err) {
@@ -247,7 +242,6 @@ function renderMaquinas() {
     </div>
   `).join('');
 
-  // Listeners de remoção
   list.querySelectorAll('.remove-maquina').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -256,7 +250,6 @@ function renderMaquinas() {
         await api.deletarMaquina(estadoConfig.linhaId, id);
         estadoConfig.maquinas = estadoConfig.maquinas.filter(m => m.id !== id);
         renderMaquinas();
-        renderSelectMinhaMaquina();
         showToast('Máquina removida');
       } catch {
         showToast('Erro ao remover máquina', 'erro');
@@ -264,7 +257,6 @@ function renderMaquinas() {
     });
   });
 
-  // Drag and drop
   let dragging = null;
 
   list.querySelectorAll('.maquina-item').forEach(item => {
@@ -285,14 +277,12 @@ function renderMaquinas() {
         ordem: i + 1,
       }));
 
-      // Atualiza localmente
       novaOrdem.forEach(({ id, ordem }) => {
         const m = estadoConfig.maquinas.find(m => m.id === id);
         if (m) m.ordem = ordem;
       });
       estadoConfig.maquinas.sort((a, b) => a.ordem - b.ordem);
 
-      // Salva no backend
       try {
         await Promise.all(
           novaOrdem.map(({ id, ordem }) =>
@@ -300,7 +290,6 @@ function renderMaquinas() {
           )
         );
         renderMaquinas();
-        renderSelectMinhaMaquina();
         showToast('Ordem salva');
       } catch (err) {
         console.error('Erro ao salvar ordem:', err);
@@ -323,43 +312,11 @@ function renderMaquinas() {
   });
 }
 
-function renderSelectMinhaMaquina() {
-  const select = document.getElementById('cfg-minha-maquina-select');
-  const section = document.getElementById('cfg-minha-maquina-section');
-
-  if (estadoConfig.maquinas.length === 0) {
-    section.classList.add('hidden');
-    return;
-  }
-
-  section.classList.remove('hidden');
-  select.innerHTML = '<option value="">Selecione sua máquina...</option>';
-  estadoConfig.maquinas.forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = m.id;
-    opt.textContent = `${m.ordem}. ${m.nome}`;
-    select.appendChild(opt);
-  });
-
-  const saved = store.config.maquinaId;
-  if (saved) select.value = saved;
-
-  select.onchange = () => {
-    estadoConfig.maquinaId = select.value || null;
-  };
-}
-
 function limparMaquinas() {
   estadoConfig.maquinas = [];
-  estadoConfig.maquinaId = null;
-
   const section = document.getElementById('cfg-maquinas-section');
-  const minhaMaquinaSection = document.getElementById('cfg-minha-maquina-section');
   const list = document.getElementById('cfg-maquinas-list');
-
-  section.classList.add('hidden');
-  minhaMaquinaSection.classList.add('hidden');
-
+  if (section) section.classList.add('hidden');
   if (list) list.innerHTML = '';
 }
 
@@ -379,16 +336,10 @@ function configurarBotaoSalvar() {
   const btn = document.getElementById('cfg-save-btn');
   if (!btn) return;
   btn.addEventListener('click', () => {
-    const maquinaSelecionada = estadoConfig.maquinas.find(
-      m => m.id === parseInt(document.getElementById('cfg-minha-maquina-select').value)
-    );
-
     store.updateConfig({
       clienteId: estadoConfig.clienteId,
       linhaId: estadoConfig.linhaId,
-      maquinaId: estadoConfig.maquinaId,
       client: document.getElementById('cfg-cliente-select').selectedOptions[0]?.text || '',
-      machine: maquinaSelecionada?.nome || '',
       speed: parseInt(document.getElementById('cfg-speed').value) || 0,
       shiftStart: document.getElementById('cfg-shift-start').value,
       shiftEnd: document.getElementById('cfg-shift-end').value,

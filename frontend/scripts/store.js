@@ -104,8 +104,7 @@ export const store = {
 
   isConfigured() {
     const c = this._data.config;
-    console.log('isConfigured check:', c.client, c.machine, c.speed, c.maquinaId);
-    return c.client && c.machine && c.speed > 0 && c.maquinaId;
+    return c.client && c.linhaId && c.speed > 0;
   },
 
   // ============================================================
