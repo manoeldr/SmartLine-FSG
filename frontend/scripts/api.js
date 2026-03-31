@@ -81,4 +81,10 @@ export const api = {
   async listarMedicoesDaLinha(linhaId) {
     return request('GET', `/medicoes/?linha_id=${linhaId}`);
   },
+
+  async listarMaquinasDisponiveis(linhaId) {
+    console.log('listarMaquinasDisponiveis chamado com linhaId:', linhaId);
+    return request('GET', `/linhas/${linhaId}/maquinas/disponiveis`);
+  },
 };
+
