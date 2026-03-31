@@ -22,7 +22,12 @@ export function initConfig() {
     configurarAlarmes();
     configurarBotaoSalvar();
     configurarBotaoReset();
+    configurarBotaoAdicionarCliente();
+    configurarBotaoAdicionarLinha();
     configurarBotaoAdicionarMaquina();
+    configurarSelectCliente();
+    configurarSelectLinha();
+    carregarClientes();
   }, 50);
 }
 
@@ -31,7 +36,6 @@ export function initConfig() {
 // ============================================================
 
 async function carregarClientes() {
-  console.log('carregarClientes chamado', new Error().stack);
   const select = document.getElementById('cfg-cliente-select');
   const loading = document.getElementById('cfg-cliente-loading');
 
@@ -60,7 +64,12 @@ async function carregarClientes() {
     loading.classList.add('hidden');
     select.disabled = false;
   }
+}
 
+function configurarSelectCliente() {
+  const select = document.getElementById('cfg-cliente-select');
+  if (!select || select.dataset.listenerAdded) return;
+  select.dataset.listenerAdded = 'true';
   select.addEventListener('change', async () => {
     estadoConfig.clienteId = select.value || null;
     estadoConfig.linhaId = null;
@@ -69,20 +78,27 @@ async function carregarClientes() {
     limparMaquinas();
     if (estadoConfig.clienteId) await carregarLinhas(estadoConfig.clienteId);
   });
+}
 
-  document.getElementById('cfg-cliente-add-btn').addEventListener('click', async (e) => {
+function configurarBotaoAdicionarCliente() {
+  const btn = document.getElementById('cfg-cliente-add-btn');
+  if (!btn) return;
+  const novo = btn.cloneNode(true);
+  btn.parentNode.replaceChild(novo, btn);
+  novo.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
     const input = document.getElementById('cfg-cliente-novo');
     const nome = input.value.trim();
     if (!nome) return;
     try {
-      const novo = await api.criarCliente(nome);
+      const criado = await api.criarCliente(nome);
+      const select = document.getElementById('cfg-cliente-select');
       const opt = document.createElement('option');
-      opt.value = novo.id;
-      opt.textContent = novo.nome;
+      opt.value = criado.id;
+      opt.textContent = criado.nome;
       select.appendChild(opt);
-      select.value = novo.id;
+      select.value = criado.id;
       select.dispatchEvent(new Event('change'));
       input.value = '';
       showToast('Cliente cadastrado');
@@ -121,12 +137,45 @@ async function carregarLinhas(clienteId) {
   } catch {
     showToast('Erro ao carregar linhas', 'erro');
   }
+}
 
+function configurarSelectLinha() {
+  const select = document.getElementById('cfg-linha-select');
+  if (!select || select.dataset.listenerAdded) return;
+  select.dataset.listenerAdded = 'true';
   select.addEventListener('change', async () => {
     estadoConfig.linhaId = select.value || null;
     estadoConfig.maquinaId = null;
     limparMaquinas();
     if (estadoConfig.linhaId) await carregarMaquinas(estadoConfig.linhaId);
+  });
+}
+
+function configurarBotaoAdicionarLinha() {
+  const btn = document.getElementById('cfg-linha-add-btn');
+  if (!btn) return;
+  const novo = btn.cloneNode(true);
+  btn.parentNode.replaceChild(novo, btn);
+  novo.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const input = document.getElementById('cfg-linha-nova');
+    const nome = input.value.trim();
+    if (!nome || !estadoConfig.clienteId) return;
+    try {
+      const criada = await api.criarLinha(nome, estadoConfig.clienteId);
+      const select = document.getElementById('cfg-linha-select');
+      const opt = document.createElement('option');
+      opt.value = criada.id;
+      opt.textContent = criada.nome;
+      select.appendChild(opt);
+      select.value = criada.id;
+      select.dispatchEvent(new Event('change'));
+      input.value = '';
+      showToast('Linha cadastrada');
+    } catch (err) {
+      showToast(err.message || 'Erro ao cadastrar linha', 'erro');
+    }
   });
 }
 
@@ -158,12 +207,9 @@ async function carregarMaquinas(linhaId) {
 function configurarBotaoAdicionarMaquina() {
   const btn = document.getElementById('cfg-maquina-add-btn');
   if (!btn) return;
-  
-  // Remove listeners anteriores clonando o botão
-  const novoBt = btn.cloneNode(true);
-  btn.parentNode.replaceChild(novoBt, btn);
-  
-  novoBt.addEventListener('click', async (e) => {
+  const novo = btn.cloneNode(true);
+  btn.parentNode.replaceChild(novo, btn);
+  novo.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
     const input = document.getElementById('cfg-maquina-nova');
@@ -171,8 +217,8 @@ function configurarBotaoAdicionarMaquina() {
     if (!nome || !estadoConfig.linhaId) return;
     const ordem = estadoConfig.maquinas.length + 1;
     try {
-      const nova = await api.criarMaquina(estadoConfig.linhaId, nome, ordem);
-      estadoConfig.maquinas.push(nova);
+      const criada = await api.criarMaquina(estadoConfig.linhaId, nome, ordem);
+      estadoConfig.maquinas.push(criada);
       renderMaquinas();
       renderSelectMinhaMaquina();
       input.value = '';
