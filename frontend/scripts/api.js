@@ -1,0 +1,80 @@
+// ============================================================
+// API.JS — Camada de comunicação com o backend
+// Centraliza todas as chamadas fetch à API do SmartLine
+// ============================================================
+
+const BASE_URL = 'http://127.0.0.1:5000';
+
+async function request(method, path, body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const r = await fetch(`${BASE_URL}${path}`, opts);
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `Erro ${r.status}`);
+    }
+    return await r.json();
+  } catch (e) {
+    throw e;
+  }
+}
+
+// ── Clientes ──────────────────────────────────────────────
+export const api = {
+  async listarClientes() {
+    return request('GET', '/clientes/');
+  },
+
+  async criarCliente(nome) {
+    return request('POST', '/clientes/', { nome });
+  },
+
+  // ── Linhas ──────────────────────────────────────────────
+  async listarLinhas(clienteId) {
+    return request('GET', `/linhas/?cliente_id=${clienteId}`);
+  },
+
+  async criarLinha(nome, clienteId) {
+    return request('POST', '/linhas/', { nome, cliente_id: clienteId });
+  },
+
+  // ── Máquinas da linha ────────────────────────────────────
+  async listarMaquinas(linhaId) {
+    return request('GET', `/linhas/${linhaId}/maquinas/`);
+  },
+
+  async criarMaquina(linhaId, nome, ordem) {
+    return request('POST', `/linhas/${linhaId}/maquinas/`, { nome, ordem, linha_id: linhaId });
+  },
+
+  async deletarMaquina(linhaId, maquinaId) {
+    return request('DELETE', `/linhas/${linhaId}/maquinas/${maquinaId}`);
+  },
+
+  // ── Medições ─────────────────────────────────────────────
+  async criarMedicao(dados) {
+    return request('POST', '/medicoes/', dados);
+  },
+
+  async registrarEvento(medicaoId, tipo, motivo = null, producaoLeitura = null) {
+    return request('POST', `/medicoes/${medicaoId}/eventos/`, {
+      tipo,
+      motivo,
+      producao_leitura: producaoLeitura,
+    });
+  },
+
+  async finalizarMedicao(medicaoId, producaoFinal) {
+    return request('PATCH', `/medicoes/${medicaoId}/finalizar`, {
+      producao_final: producaoFinal,
+    });
+  },
+
+  async listarMedicoesDaLinha(linhaId) {
+    return request('GET', `/medicoes/?linha_id=${linhaId}`);
+  },
+};

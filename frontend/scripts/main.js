@@ -16,9 +16,12 @@ const container = document.getElementById('page-container');
 const navButtons = document.querySelectorAll('.nav-btn');
 let currentPage = null; // Página ativa no momento
 
+console.log('main.js carregado', new Date().toISOString());
+
 // Carrega uma página dinamicamente via fetch do HTML
 // e inicializa o módulo JS correspondente
 async function loadPage(name) {
+  console.log('loadPage chamado:', name, 'currentPage:', currentPage, new Error().stack);
   // Evita recarregar a mesma página
   if (currentPage === name) return;
 
@@ -31,7 +34,7 @@ async function loadPage(name) {
   navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.page === name));
 
   try {
-     // Carrega o HTML da página com cache desativado (vital para o Live Server)
+    // Carrega o HTML da página com cache desativado (vital para o Live Server)
     const resp = await fetch(`pages/${name}.html`, { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status} - Falha ao carregar página`);
 
@@ -50,7 +53,7 @@ async function loadPage(name) {
       case 'config': initConfig(); break;
     }
   } catch (e) {
-    if (currentPage !== name) return; // Navegação foi cancelada
+    if (currentPage !== name) return;
     console.error('Erro ao carregar página:', e);
     container.innerHTML = `<div class="empty-state"><p>Erro ao carregar página</p></div>`;
   }
@@ -58,7 +61,10 @@ async function loadPage(name) {
 
 // Configura os botões da navbar pra navegar entre páginas
 navButtons.forEach(btn => {
-  btn.addEventListener('click', () => loadPage(btn.dataset.page));
+  btn.addEventListener('click', (e) => {
+    console.log('Nav clicado:', btn.dataset.page, 'target:', e.target, 'currentTarget:', e.currentTarget);
+    loadPage(btn.dataset.page);
+  });
 });
 
 // Tick global: roda a cada 1 segundo pra atualizar timers,

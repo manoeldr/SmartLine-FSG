@@ -3,63 +3,98 @@
     <h1>Configuração</h1>
   </header>
 
+  <!-- SEÇÃO 1: CLIENTE -->
   <div class="section-card">
-    <h3>Dados do cliente</h3>
+    <h3>Cliente</h3>
     <div class="form-group">
-      <label>Nome da empresa</label>
-      <input type="text" id="cfg-client" class="input" placeholder="Ex: Vinícola Aurora">
+      <label>Selecionar cliente</label>
+      <span id="cfg-cliente-loading" class="hidden" style="font-size:0.8rem;color:var(--text-dim)">Carregando...</span>
+      <select id="cfg-cliente-select" class="input">
+        <option value="">Selecione um cliente...</option>
+      </select>
+    </div>
+    <div class="form-row" style="margin-top:8px">
+      <input type="text" id="cfg-cliente-novo" class="input flex-1" placeholder="Novo cliente...">
+      <button type="button" class="btn btn-sm" id="cfg-cliente-add-btn">+</button>
     </div>
   </div>
 
-  <div class="section-card">
-    <h3>Máquina sendo medida</h3>
+  <!-- SEÇÃO 2: LINHA -->
+  <div class="section-card hidden" id="cfg-linha-section">
+    <h3>Linha de produção</h3>
     <div class="form-group">
-      <label>Nome da máquina</label>
-      <input type="text" id="cfg-machine" class="input" placeholder="Ex: Enchedora">
+      <label>Selecionar linha</label>
+      <select id="cfg-linha-select" class="input">
+        <option value="">Selecione uma linha...</option>
+      </select>
     </div>
+    <div class="form-row" style="margin-top:8px">
+      <input type="text" id="cfg-linha-nova" class="input flex-1" placeholder="Nova linha...">
+      <button type="button" class="btn btn-sm" id="cfg-linha-add-btn">+</button>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 3: FLUXO DA LINHA -->
+  <div class="section-card hidden" id="cfg-maquinas-section">
+    <h3>Fluxo da linha</h3>
+    <div id="cfg-maquinas-list"></div>
+    <div class="form-row" style="margin-top:12px">
+      <input type="text" id="cfg-maquina-nova" class="input flex-1" placeholder="Nome da máquina...">
+      <button type="button" class="btn btn-sm" id="cfg-maquina-add-btn">+</button>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 4: MINHA MÁQUINA -->
+  <div class="section-card hidden" id="cfg-minha-maquina-section">
+    <h3>Minha máquina</h3>
+    <div class="form-group">
+      <label>Qual máquina você vai medir?</label>
+      <select id="cfg-minha-maquina-select" class="input">
+        <option value="">Selecione sua máquina...</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 5: CONFIGURAÇÃO DA MEDIÇÃO -->
+  <div class="section-card">
+    <h3>Configuração da medição</h3>
     <div class="form-group">
       <label>Velocidade nominal (unidades/hora)</label>
       <input type="number" id="cfg-speed" class="input" placeholder="Ex: 12000" inputmode="numeric">
     </div>
-  </div>
-
-  <div class="section-card">
-    <h3>Turno da medição</h3>
     <div class="form-row">
       <div class="form-group flex-1">
-        <label>Início</label>
+        <label>Início do turno</label>
         <input type="time" id="cfg-shift-start" class="input" value="08:00">
       </div>
       <div class="form-group flex-1">
-        <label>Fim</label>
+        <label>Fim do turno</label>
         <input type="time" id="cfg-shift-end" class="input" value="17:00">
       </div>
     </div>
-  </div>
-
-  <div class="section-card">
-    <h3>Alarmes / motivos de parada</h3>
-    <div class="alarm-list" id="cfg-alarm-list"></div>
-    <div class="form-row" style="margin-top: 12px;">
-      <input type="text" id="cfg-new-alarm" class="input flex-1" placeholder="Nome do alarme...">
-      <select id="cfg-new-alarm-cat" class="input" style="width: auto; min-width: 100px;">
-        <option value="Interna">Interna</option>
-        <option value="Externa">Externa</option>
-      </select>
-      <button class="btn btn-sm" id="cfg-add-alarm">+</button>
-    </div>
-  </div>
-
-  <div class="section-card">
-    <h3>Produção</h3>
     <div class="form-group">
       <label>Intervalo para solicitar produção (minutos)</label>
       <input type="number" id="cfg-prod-interval" class="input" value="30" inputmode="numeric">
     </div>
   </div>
 
-  <button class="btn btn-primary btn-block" id="cfg-save-btn">Salvar configuração</button>
+  <!-- SEÇÃO 6: ALARMES -->
+  <div class="section-card">
+    <h3>Alarmes / motivos de parada</h3>
+    <div class="alarm-list" id="cfg-alarm-list"></div>
+    <div class="form-row" style="margin-top:12px">
+      <input type="text" id="cfg-new-alarm" class="input flex-1" placeholder="Nome do alarme...">
+      <select id="cfg-new-alarm-cat" class="input" style="width:auto;min-width:100px">
+        <option value="Interna">Interna</option>
+        <option value="Externa">Externa</option>
+      </select>
+      <button type="button" class="btn btn-sm" id="cfg-add-alarm">+</button>
+    </div>
+  </div>
 
+  <button type="button" class="btn btn-primary btn-block" id="cfg-save-btn">Salvar configuração</button>
+
+  <!-- TEMA -->
   <div class="section-card">
     <h3>Aparência</h3>
     <div class="theme-toggle-row">
@@ -76,9 +111,10 @@
     </div>
   </div>
 
+  <!-- ZONA DE PERIGO -->
   <div class="section-card danger-zone">
     <h3>Zona de perigo</h3>
-    <button class="btn btn-danger btn-block" id="cfg-reset-btn">Resetar medição atual</button>
+    <button type="button" class="btn btn-danger btn-block" id="cfg-reset-btn">Resetar medição atual</button>
     <p class="danger-text">Isso apaga todos os dados da medição em andamento</p>
   </div>
 </div>
