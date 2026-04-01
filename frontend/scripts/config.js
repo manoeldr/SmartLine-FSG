@@ -71,7 +71,12 @@ function configurarSelectCliente() {
   select.addEventListener('change', async () => {
     estadoConfig.clienteId = select.value || null;
     estadoConfig.linhaId = null;
-    store.updateConfig({ linhaId: null, maquinaId: null });
+    store.updateConfig({
+      clienteId: estadoConfig.clienteId,
+      client: select.selectedOptions[0]?.text || '',
+      linhaId: null,
+      maquinaId: null,
+    });
     limparLinhas();
     limparMaquinas();
     if (estadoConfig.clienteId) await carregarLinhas(estadoConfig.clienteId);
@@ -143,7 +148,7 @@ function configurarSelectLinha() {
   select.dataset.listenerAdded = 'true';
   select.addEventListener('change', async () => {
     estadoConfig.linhaId = select.value || null;
-    store.updateConfig({ maquinaId: null });
+    store.updateConfig({ linhaId: estadoConfig.linhaId, maquinaId: null });
     limparMaquinas();
     if (estadoConfig.linhaId) await carregarMaquinas(estadoConfig.linhaId);
   });
@@ -238,9 +243,21 @@ function renderMaquinas() {
       <span class="drag-handle">⠿</span>
       <span class="maquina-ordem">${m.ordem}</span>
       <span class="maquina-nome">${m.nome}</span>
+      <button type="button" class="btn-icon config-maquina" data-id="${m.id}" data-nome="${m.nome}" data-velocidade="${m.velocidade_nominal || ''}" data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
       <button type="button" class="btn-icon remove-maquina" data-id="${m.id}">×</button>
     </div>
   `).join('');
+
+  list.querySelectorAll('.config-maquina').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      const nome = btn.dataset.nome;
+      const velocidade = btn.dataset.velocidade;
+      const alarmes = JSON.parse(decodeURIComponent(btn.dataset.alarmes));
+      abrirModalConfigMaquina(id, nome, velocidade, alarmes);
+    });
+  });
 
   list.querySelectorAll('.remove-maquina').forEach(btn => {
     btn.addEventListener('click', async (e) => {
@@ -318,6 +335,104 @@ function limparMaquinas() {
   const list = document.getElementById('cfg-maquinas-list');
   if (section) section.classList.add('hidden');
   if (list) list.innerHTML = '';
+}
+
+// ============================================================
+// MODAL: CONFIGURAR MÁQUINA
+// ============================================================
+
+function abrirModalConfigMaquina(maquinaId, nome, velocidade, alarmes) {
+  document.getElementById('modal-config-maquina')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-config-maquina';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal">
+      <h3>${nome}</h3>
+      <p class="modal-sub">Configuração específica desta máquina</p>
+
+      <div class="form-group">
+        <label>Velocidade nominal (unidades/hora)</label>
+        <input type="number" id="modal-maq-velocidade" class="input" placeholder="Ex: 12000" value="${velocidade}" inputmode="numeric">
+      </div>
+
+      <div class="form-group">
+        <label>Alarmes / motivos de parada</label>
+        <div id="modal-maq-alarm-list" style="margin-bottom:8px;"></div>
+        <div class="form-row">
+          <input type="text" id="modal-maq-new-alarm" class="input flex-1" placeholder="Novo alarme...">
+          <select id="modal-maq-new-alarm-cat" class="input" style="width:auto;min-width:100px">
+            <option value="Interna">Interna</option>
+            <option value="Externa">Externa</option>
+          </select>
+          <button type="button" class="btn btn-sm" id="modal-maq-add-alarm">+</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-block" id="modal-maq-salvar" style="margin-top:8px;">Salvar</button>
+      <button type="button" class="btn btn-outline btn-block" id="modal-maq-cancelar" style="margin-top:8px;">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  let alarmesList = [...alarmes];
+
+  function renderAlarmesList() {
+    const list = document.getElementById('modal-maq-alarm-list');
+    if (alarmesList.length === 0) {
+      list.innerHTML = '<p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px;">Nenhum alarme cadastrado</p>';
+      return;
+    }
+    list.innerHTML = alarmesList.map((a, i) => `
+      <div class="alarm-item">
+        <span>${a.name} <span style="font-size:0.7rem;color:var(--text-dim);">(${a.category})</span></span>
+        <button type="button" class="remove-alarm" data-index="${i}">×</button>
+      </div>
+    `).join('');
+    list.querySelectorAll('.remove-alarm').forEach(btn => {
+      btn.addEventListener('click', () => {
+        alarmesList.splice(parseInt(btn.dataset.index), 1);
+        renderAlarmesList();
+      });
+    });
+  }
+
+  renderAlarmesList();
+
+  document.getElementById('modal-maq-add-alarm').addEventListener('click', () => {
+    const input = document.getElementById('modal-maq-new-alarm');
+    const cat = document.getElementById('modal-maq-new-alarm-cat').value;
+    const nomeAlarme = input.value.trim();
+    if (!nomeAlarme) return;
+    if (!alarmesList.find(a => a.name === nomeAlarme)) {
+      alarmesList.push({ name: nomeAlarme, category: cat });
+      renderAlarmesList();
+    }
+    input.value = '';
+  });
+
+  document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
+    const velocidadeVal = parseFloat(document.getElementById('modal-maq-velocidade').value) || null;
+    try {
+      await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, {
+        velocidade_nominal: velocidadeVal,
+        alarmes: JSON.stringify(alarmesList),
+      });
+      const m = estadoConfig.maquinas.find(m => m.id === maquinaId);
+      if (m) {
+        m.velocidade_nominal = velocidadeVal;
+        m.alarmes = JSON.stringify(alarmesList);
+      }
+      modal.remove();
+      renderMaquinas();
+      showToast('Configuração salva');
+    } catch (err) {
+      showToast(err.message || 'Erro ao salvar', 'erro');
+    }
+  });
+
+  document.getElementById('modal-maq-cancelar').addEventListener('click', () => modal.remove());
 }
 
 // ============================================================

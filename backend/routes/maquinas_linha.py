@@ -52,6 +52,10 @@ def atualizar_maquina(linha_id: int, maquina_id: int, dados: MaquinaLinhaUpdate,
         maquina.nome = dados.nome
     if dados.ordem is not None:
         maquina.ordem = dados.ordem
+    if dados.velocidade_nominal is not None:
+        maquina.velocidade_nominal = dados.velocidade_nominal
+    if dados.alarmes is not None:
+        maquina.alarmes = dados.alarmes
     db.commit()
     db.refresh(maquina)
     return maquina
