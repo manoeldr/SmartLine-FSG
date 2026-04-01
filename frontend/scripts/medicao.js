@@ -7,6 +7,7 @@ import { api } from './api.js';
 import { formatTime, formatTimeMM, vibrate } from './utils.js';
 
 let maquinaSelecionada = null;
+let currentMachineAlarms = [];
 
 export function initMedicao() {
   const notConfigured = document.getElementById('med-not-configured');
@@ -78,13 +79,29 @@ function showActiveScreen() {
   replaceWithClone('btn-cancel-finalize',    el => el.addEventListener('click', () => {
     document.getElementById('modal-finalize')?.classList.add('hidden');
   }));
-  replaceWithClone('btn-add-custom-reason', el => el.addEventListener('click', () => {
+  replaceWithClone('btn-add-custom-reason', el => el.addEventListener('click', async () => {
     const input = document.getElementById('custom-reason-input');
-    if (input.value.trim()) {
-      store.addAlarm(input.value.trim(), 'Interna');
-      input.value = '';
-      renderAlarmList();
+    const catSelect = document.getElementById('custom-reason-category');
+    const name = input?.value.trim();
+    const category = catSelect?.value || 'Interna';
+    if (!name) return;
+
+    if (!currentMachineAlarms.some(a => a.name === name)) {
+      currentMachineAlarms.push({ name, category });
+      renderAlarmList(currentMachineAlarms);
+
+      const linhaId = store.config.linhaId;
+      const maquinaId = store.config.maquinaLinhaId || (store.config.maquinaId ? Number(store.config.maquinaId) : null);
+      if (linhaId && maquinaId) {
+        try {
+          await api.atualizarMaquina(linhaId, maquinaId, { alarmes: JSON.stringify(currentMachineAlarms) });
+        } catch (err) {
+          console.warn('Não foi possível salvar alarme de máquina:', err);
+        }
+      }
     }
+
+    if (input) input.value = '';
   }));
   replaceWithClone('btn-end-shift', el => el.addEventListener('click', () => {
     store.markShiftEndPrompted();
@@ -146,10 +163,10 @@ async function abrirModalIniciar() {
     } else {
       if (empty) empty.classList.add('hidden');
       list.innerHTML = maquinas.map(m => `
-      <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}" style="justify-content:flex-start;">
-        <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
-        <span>${m.nome}</span>
-      </div>
+        <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}" style="justify-content:flex-start;">
+          <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
+          <span>${m.nome}</span>
+        </div>
       `).join('');
 
       list.querySelectorAll('.alarm-item').forEach(el => {
@@ -164,7 +181,7 @@ async function abrirModalIniciar() {
   }
 
   replaceWithClone('btn-confirmar-inicio', el => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', async () => {
       const selected = list.querySelector('.alarm-item.selected');
       if (!selected) {
         list.style.outline = '1px solid var(--red)';
@@ -184,10 +201,29 @@ async function abrirModalIniciar() {
         nome: selected.dataset.nome,
       };
 
-      store.updateConfig({
-        machine: maquinaSelecionada.nome,
-        maquinaId: String(maquinaSelecionada.id),
-      });
+      // Busca detalhes da máquina para pegar alarmes e velocidade nominal
+      try {
+        const linhaId = store.config.linhaId;
+        const todasMaquinas = await api.listarMaquinas(linhaId);
+        const maquinaDetalhes = todasMaquinas.find(m => m.id === maquinaSelecionada.id);
+
+        const multiplier = Number(maquinaDetalhes?.multiplicador_produto ?? store.config.productMultiplier ?? 1) || 1;
+        const rawSpeed = Number(maquinaDetalhes?.velocidade_nominal ?? store.config.speed) || 0;
+        store.updateConfig({
+          machine: maquinaSelecionada.nome,
+          maquinaId: String(maquinaSelecionada.id),
+          maquinaLinhaId: maquinaSelecionada.id,
+          speed: rawSpeed,
+          productMultiplier: multiplier,
+          alarms: maquinaDetalhes?.alarmes ? JSON.parse(maquinaDetalhes.alarmes) : store.config.alarms,
+        });
+      } catch {
+        store.updateConfig({
+          machine: maquinaSelecionada.nome,
+          maquinaId: String(maquinaSelecionada.id),
+          maquinaLinhaId: maquinaSelecionada.id,
+        });
+      }
 
       modal.classList.add('hidden');
       input.value = '';
@@ -227,7 +263,9 @@ function handleMarcha() {
   vibrate([100]);
   updateButtonStates();
   showStopReasonModal().then(reason => {
-    store.setStopReason(reason);
+    const cat = (window._pendingReasonCategory || 'Interna');
+    store.setStopReason(reason, cat);
+    window._pendingReasonCategory = null;
   });
 }
 
@@ -243,31 +281,57 @@ function handleParada() {
 // MODAL: MOTIVO DA PARADA
 // ============================================================
 
+async function getCurrentMachineAlarms() {
+  const linhaId = store.config.linhaId;
+  const maquinaId = store.config.maquinaLinhaId || (store.config.maquinaId ? Number(store.config.maquinaId) : null);
+  let alarms = Array.isArray(store.config.alarms) ? store.config.alarms : [];
+
+  if (linhaId && maquinaId) {
+    try {
+      const maquinas = await api.listarMaquinas(linhaId);
+      const maquina = maquinas.find(m => Number(m.id) === Number(maquinaId));
+      if (maquina?.alarmes) {
+        const parsed = JSON.parse(maquina.alarmes);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          alarms = parsed;
+        }
+      }
+    } catch (e) {
+      // ignora e usa fallback
+    }
+  }
+
+  currentMachineAlarms = alarms;
+  return alarms;
+}
+
 function showStopReasonModal() {
-  return new Promise(resolve => {
+  return new Promise(async resolve => {
     const modal = document.getElementById('modal-stop-reason');
     if (!modal) { resolve('Não informado'); return; }
-    renderAlarmList();
+    const alarms = await getCurrentMachineAlarms();
+    renderAlarmList(alarms);
     modal.classList.remove('hidden');
     document.querySelectorAll('#alarm-list-modal .alarm-item').forEach(el => el.classList.remove('selected'));
     window._pendingReasonResolve = resolve;
+    window._pendingReasonCategory = null;
   });
 }
 
-function renderAlarmList() {
+function renderAlarmList(alarms = store.config.alarms) {
   const list = document.getElementById('alarm-list-modal');
   if (!list) return;
   const categories = {};
-  for (const alarm of store.config.alarms) {
+  for (const alarm of alarms) {
     const cat = alarm.category || 'Interna';
     if (!categories[cat]) categories[cat] = [];
     categories[cat].push(alarm.name);
   }
   let html = '';
-  for (const [cat, alarms] of Object.entries(categories)) {
+  for (const [cat, alarmsList] of Object.entries(categories)) {
     html += `<div class="alarm-category-label">${cat}</div>`;
-    for (const name of alarms) {
-      html += `<div class="alarm-item" data-name="${name}">${name}</div>`;
+    for (const name of alarmsList) {
+      html += `<div class="alarm-item" data-name="${name}" data-category="${cat}">${name}</div>`;
     }
   }
   list.innerHTML = html;
@@ -282,13 +346,36 @@ function renderAlarmList() {
 function handleConfirmReason() {
   const selected = document.querySelector('#alarm-list-modal .alarm-item.selected');
   const customInput = document.getElementById('custom-reason-input');
-  const reason = selected ? selected.dataset.name : (customInput.value.trim() || 'Não informado');
-  if (customInput.value.trim() && !selected) {
-    store.addAlarm(customInput.value.trim(), 'Interna');
+  const categorySelect = document.getElementById('custom-reason-category');
+
+  let reason = 'Não informado';
+  let category = 'Interna';
+
+  if (selected) {
+    reason = selected.dataset.name;
+    category = selected.dataset.category || 'Interna';
+  } else if (customInput && customInput.value.trim()) {
+    reason = customInput.value.trim();
+    category = categorySelect?.value || 'Interna';
+
+    if (!currentMachineAlarms.some(a => a.name === reason)) {
+      currentMachineAlarms.push({ name: reason, category });
+      renderAlarmList(currentMachineAlarms);
+
+      const linhaId = store.config.linhaId;
+      const maquinaId = store.config.maquinaLinhaId || (store.config.maquinaId ? Number(store.config.maquinaId) : null);
+      if (linhaId && maquinaId) {
+        api.atualizarMaquina(linhaId, maquinaId, { alarmes: JSON.stringify(currentMachineAlarms) }).catch(err => {
+          console.warn('Não foi possível salvar alarme de máquina:', err);
+        });
+      }
+    }
   }
+
   if (customInput) customInput.value = '';
   document.getElementById('modal-stop-reason')?.classList.add('hidden');
   if (window._pendingReasonResolve) {
+    window._pendingReasonCategory = category;
     window._pendingReasonResolve(reason);
     window._pendingReasonResolve = null;
   }

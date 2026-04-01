@@ -256,7 +256,7 @@ function renderMaquinas() {
       <span class="drag-handle">⠿</span>
       <span class="maquina-ordem">${m.ordem}</span>
       <span class="maquina-nome">${m.nome}</span>
-      <button type="button" class="btn-icon config-maquina" data-id="${m.id}" data-nome="${m.nome}" data-velocidade="${m.velocidade_nominal || ''}" data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
+      <button type="button" class="btn-icon config-maquina" data-id="${m.id}" data-nome="${m.nome}" data-velocidade="${m.velocidade_nominal || ''}" data-multiplicador="${m.multiplicador_produto ?? 1}" data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
       <button type="button" class="btn-icon remove-maquina" data-id="${m.id}">×</button>
     </div>
   `).join('');
@@ -267,8 +267,9 @@ function renderMaquinas() {
       const id = parseInt(btn.dataset.id);
       const nome = btn.dataset.nome;
       const velocidade = btn.dataset.velocidade;
+      const multiplicador = btn.dataset.multiplicador;
       const alarmes = JSON.parse(decodeURIComponent(btn.dataset.alarmes));
-      abrirModalConfigMaquina(id, nome, velocidade, alarmes);
+      abrirModalConfigMaquina(id, nome, velocidade, multiplicador, alarmes);
     });
   });
 
@@ -354,7 +355,7 @@ function limparMaquinas() {
 // MODAL: CONFIGURAR MÁQUINA
 // ============================================================
 
-function abrirModalConfigMaquina(maquinaId, nome, velocidade, alarmes) {
+function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1, alarmes) {
   document.getElementById('modal-config-maquina')?.remove();
 
   const modal = document.createElement('div');
@@ -368,6 +369,12 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, alarmes) {
       <div class="form-group">
         <label>Velocidade nominal (unidades/hora)</label>
         <input type="number" id="modal-maq-velocidade" class="input" placeholder="Ex: 12000" value="${velocidade}" inputmode="numeric">
+      </div>
+
+      <div class="form-group">
+        <label>Multiplicador de produto</label>
+        <input type="number" step="0.01" min="0.01" id="modal-maq-multiplicador" class="input" placeholder="Ex: 24 (garrafas por caixa)" value="${multiplicador}">
+        <p class="modal-sub" style="margin-top:4px;">Aplicado sobre velocidade nominal para cálculo de unidades finais.</p>
       </div>
 
       <div class="form-group">
@@ -427,14 +434,17 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, alarmes) {
 
   document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
     const velocidadeVal = parseFloat(document.getElementById('modal-maq-velocidade').value) || null;
+    const multiplicadorVal = parseFloat(document.getElementById('modal-maq-multiplicador').value) || 1;
     try {
       await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, {
         velocidade_nominal: velocidadeVal,
+        multiplicador_produto: multiplicadorVal,
         alarmes: JSON.stringify(alarmesList),
       });
       const m = estadoConfig.maquinas.find(m => m.id === maquinaId);
       if (m) {
         m.velocidade_nominal = velocidadeVal;
+        m.multiplicador_produto = multiplicadorVal;
         m.alarmes = JSON.stringify(alarmesList);
       }
       modal.remove();

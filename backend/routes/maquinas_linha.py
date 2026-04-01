@@ -13,7 +13,13 @@ def criar_maquina(linha_id: int, dados: MaquinaLinhaCreate, db: Session = Depend
     linha = db.query(Linha).filter(Linha.id == linha_id).first()
     if not linha:
         raise HTTPException(status_code=404, detail="Linha não encontrada")
-    maquina = MaquinaLinha(nome=dados.nome, ordem=dados.ordem, linha_id=linha_id)
+    multiplicador = getattr(dados, 'multiplicador_produto', None) if hasattr(dados, 'multiplicador_produto') else None
+    maquina = MaquinaLinha(
+        nome=dados.nome,
+        ordem=dados.ordem,
+        linha_id=linha_id,
+        multiplicador_produto=multiplicador if multiplicador is not None else 1
+    )
     db.add(maquina)
     db.commit()
     db.refresh(maquina)
@@ -56,6 +62,8 @@ def atualizar_maquina(linha_id: int, maquina_id: int, dados: MaquinaLinhaUpdate,
         maquina.velocidade_nominal = dados.velocidade_nominal
     if dados.alarmes is not None:
         maquina.alarmes = dados.alarmes
+    if hasattr(dados, 'multiplicador_produto') and dados.multiplicador_produto is not None:
+        maquina.multiplicador_produto = dados.multiplicador_produto
     db.commit()
     db.refresh(maquina)
     return maquina

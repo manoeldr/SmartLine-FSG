@@ -78,6 +78,7 @@ export function updateOverview() {
   const stopped = store.getStoppedMs();
   const stops = store.getStops();
   const speed = store.config.speed || 1;
+  const productMultiplier = store.config.productMultiplier || 1;
   const displayProd = store.getDisplayProduction();
   const oeeProd = store.getProductionForOEE();
 
@@ -90,7 +91,7 @@ export function updateOverview() {
 
   // Performance
   const runningHours = running / 3600000;
-  const expectedOutput = runningHours * speed;
+  const expectedOutput = runningHours * speed * productMultiplier;
   const performance = expectedOutput > 0 ? (oeeProd / expectedOutput) * 100 : 0;
 
   // OEE

@@ -16,8 +16,7 @@ const defaultData = () => ({
     machine: '',
     maquinaLinhaId: null,
     linhaId: null,
-    speed: 0,
-    shiftStart: '08:00',
+    speed: 0,    productMultiplier: 1,    shiftStart: '08:00',
     shiftEnd: '17:00',
     alarmCategories: ['Interna', 'Externa'],
     alarms: [
@@ -69,6 +68,7 @@ export const store = {
         if (this._data.config.clientId === undefined) this._data.config.clientId = null;
         if (this._data.config.linhaId === undefined) this._data.config.linhaId = null;
         if (this._data.config.maquinaLinhaId === undefined) this._data.config.maquinaLinhaId = null;
+        if (this._data.config.productMultiplier === undefined) this._data.config.productMultiplier = 1;
         if (this._data.measurement.medicaoId === undefined) this._data.measurement.medicaoId = null;
       } catch {
         this._data = defaultData();
@@ -151,12 +151,12 @@ export const store = {
     if (m.medicaoId) api.registrarEvento(m.medicaoId, 'marcha').catch(() => {});
   },
 
-  setStopReason(reason) {
+  setStopReason(reason, category = null) {
     const m = this._data.measurement;
     const lastStop = [...m.events].reverse().find(e => e.type === 'stop');
     if (lastStop && !lastStop.reason) {
       lastStop.reason = reason;
-      lastStop.category = this.getAlarmCategory(reason);
+      lastStop.category = category || this.getAlarmCategory(reason);
       this.save();
     }
   },
