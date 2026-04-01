@@ -13,6 +13,9 @@ let estadoConfig = {
   maquinas: [],
 };
 
+let carregandoLinhas = false;
+let carregandoMaquinas = false;
+
 export function initConfig() {
   setTimeout(() => {
     configurarSelectCliente();
@@ -116,6 +119,9 @@ function configurarBotaoAdicionarCliente() {
 // ============================================================
 
 async function carregarLinhas(clienteId) {
+  if (carregandoLinhas) return;
+  carregandoLinhas = true;
+
   const select = document.getElementById('cfg-linha-select');
   const section = document.getElementById('cfg-linha-section');
 
@@ -139,6 +145,8 @@ async function carregarLinhas(clienteId) {
     }
   } catch {
     showToast('Erro ao carregar linhas', 'erro');
+  } finally {
+    carregandoLinhas = false;
   }
 }
 
@@ -195,6 +203,9 @@ function limparLinhas() {
 // ============================================================
 
 async function carregarMaquinas(linhaId) {
+  if (carregandoMaquinas) return;
+  carregandoMaquinas = true;
+
   const section = document.getElementById('cfg-maquinas-section');
   section.classList.remove('hidden');
 
@@ -202,6 +213,8 @@ async function carregarMaquinas(linhaId) {
     estadoConfig.maquinas = await api.listarMaquinas(linhaId);
   } catch {
     estadoConfig.maquinas = [];
+  } finally {
+    carregandoMaquinas = false;
   }
 
   renderMaquinas();
@@ -441,7 +454,8 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, alarmes) {
 
 function preencherConfigMedicao() {
   const cfg = store.config;
-  document.getElementById('cfg-speed').value = cfg.speed || '';
+  const speedEl = document.getElementById('cfg-speed');
+  if (speedEl) speedEl.value = cfg.speed || '';
   document.getElementById('cfg-shift-start').value = cfg.shiftStart || '08:00';
   document.getElementById('cfg-shift-end').value = cfg.shiftEnd || '17:00';
   document.getElementById('cfg-prod-interval').value = cfg.productionInterval || 30;
@@ -451,11 +465,12 @@ function configurarBotaoSalvar() {
   const btn = document.getElementById('cfg-save-btn');
   if (!btn) return;
   btn.addEventListener('click', () => {
+    const speedEl = document.getElementById('cfg-speed');
     store.updateConfig({
       clienteId: estadoConfig.clienteId,
       linhaId: estadoConfig.linhaId,
-      client: document.getElementById('cfg-cliente-select').selectedOptions[0]?.text || '',
-      speed: parseInt(document.getElementById('cfg-speed').value) || 0,
+      client: document.getElementById('cfg-cliente-select')?.selectedOptions[0]?.text || store.config.client || '',
+      speed: speedEl ? parseInt(speedEl.value) || 0 : store.config.speed,
       shiftStart: document.getElementById('cfg-shift-start').value,
       shiftEnd: document.getElementById('cfg-shift-end').value,
       productionInterval: parseInt(document.getElementById('cfg-prod-interval').value) || 30,
@@ -502,18 +517,20 @@ function configurarTema() {
 }
 
 // ============================================================
-// ALARMES
+// ALARMES (globais — mantidos para compatibilidade)
 // ============================================================
 
 function configurarAlarmes() {
   const catSelect = document.getElementById('cfg-new-alarm-cat');
+  if (!catSelect) return;
+
   catSelect.innerHTML = (store.config.alarmCategories || ['Interna', 'Externa']).map(c =>
     `<option value="${c}">${c}</option>`
   ).join('');
 
   renderAlarms();
 
-  document.getElementById('cfg-add-alarm').addEventListener('click', () => {
+  document.getElementById('cfg-add-alarm')?.addEventListener('click', () => {
     const nameInput = document.getElementById('cfg-new-alarm');
     const catSelect = document.getElementById('cfg-new-alarm-cat');
     if (nameInput.value.trim()) {
@@ -523,13 +540,14 @@ function configurarAlarmes() {
     }
   });
 
-  document.getElementById('cfg-new-alarm').addEventListener('keydown', (e) => {
+  document.getElementById('cfg-new-alarm')?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cfg-add-alarm').click(); }
   });
 }
 
 function renderAlarms() {
   const list = document.getElementById('cfg-alarm-list');
+  if (!list) return;
   const alarms = store.config.alarms;
   const grouped = {};
   alarms.forEach((a, i) => {

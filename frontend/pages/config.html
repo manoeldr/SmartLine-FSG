@@ -44,44 +44,45 @@
     </div>
   </div>
 
-  <!-- SEÇÃO 5: CONFIGURAÇÃO DA MEDIÇÃO -->
-  <div class="section-card">
-    <h3>Configuração da medição</h3>
-    <div class="form-group">
-      <label>Velocidade nominal (unidades/hora)</label>
-      <input type="number" id="cfg-speed" class="input" placeholder="Ex: 12000" inputmode="numeric">
+<!-- SEÇÃO 5: CONFIGURAÇÃO DA MEDIÇÃO -->
+<div class="section-card">
+  <h3>Configuração da medição</h3>
+  <!-- <div class="form-group">
+    <label>Velocidade nominal (unidades/hora)</label>
+    <input type="number" id="cfg-speed" class="input" placeholder="Ex: 12000" inputmode="numeric">
+  </div> -->
+  <div class="form-row">
+    <div class="form-group flex-1">
+      <label>Início do turno</label>
+      <input type="time" id="cfg-shift-start" class="input" value="08:00">
     </div>
-    <div class="form-row">
-      <div class="form-group flex-1">
-        <label>Início do turno</label>
-        <input type="time" id="cfg-shift-start" class="input" value="08:00">
-      </div>
-      <div class="form-group flex-1">
-        <label>Fim do turno</label>
-        <input type="time" id="cfg-shift-end" class="input" value="17:00">
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Intervalo para solicitar produção (minutos)</label>
-      <input type="number" id="cfg-prod-interval" class="input" value="30" inputmode="numeric">
+    <div class="form-group flex-1">
+      <label>Fim do turno</label>
+      <input type="time" id="cfg-shift-end" class="input" value="17:00">
     </div>
   </div>
-
-  <!-- SEÇÃO 6: ALARMES -->
-  <div class="section-card">
-    <h3>Alarmes / motivos de parada</h3>
-    <div class="alarm-list" id="cfg-alarm-list"></div>
-    <div class="form-row" style="margin-top:12px">
-      <input type="text" id="cfg-new-alarm" class="input flex-1" placeholder="Nome do alarme...">
-      <select id="cfg-new-alarm-cat" class="input" style="width:auto;min-width:100px">
-        <option value="Interna">Interna</option>
-        <option value="Externa">Externa</option>
-      </select>
-      <button type="button" class="btn btn-sm" id="cfg-add-alarm">+</button>
-    </div>
+  <div class="form-group">
+    <label>Intervalo para solicitar produção (minutos)</label>
+    <input type="number" id="cfg-prod-interval" class="input" value="30" inputmode="numeric">
   </div>
+</div>
 
-  <button type="button" class="btn btn-primary btn-block" id="cfg-save-btn">Salvar configuração</button>
+<!-- SEÇÃO 6: ALARMES — movido para configuração por máquina
+<div class="section-card">
+  <h3>Alarmes / motivos de parada</h3>
+  <div class="alarm-list" id="cfg-alarm-list"></div>
+  <div class="form-row" style="margin-top:12px">
+    <input type="text" id="cfg-new-alarm" class="input flex-1" placeholder="Nome do alarme...">
+    <select id="cfg-new-alarm-cat" class="input" style="width:auto;min-width:100px">
+      <option value="Interna">Interna</option>
+      <option value="Externa">Externa</option>
+    </select>
+    <button type="button" class="btn btn-sm" id="cfg-add-alarm">+</button>
+  </div>
+</div>
+-->
+
+<button type="button" class="btn btn-primary btn-block" id="cfg-save-btn">Salvar configuração</button>
 
   <!-- TEMA -->
   <div class="section-card">
