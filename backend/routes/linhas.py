@@ -53,59 +53,99 @@ def status_linha(linha_id: int, db: Session = Depends(get_db)):
 
     resultado = []
     for m in maquinas:
-        # Busca medição ativa desta máquina
+        # Busca medição ativa
         medicao = db.query(Medicao).filter(
             Medicao.maquina_linha_id == m.id,
             Medicao.timestamp_fim.is_(None)
         ).first()
 
+        # Se não tem ativa, busca a última finalizada
         if not medicao:
-            resultado.append({
-                "maquina_id": m.id,
-                "maquina_nome": m.nome,
-                "ordem": m.ordem,
-                "estado": "sem_medicao",
-                "eficiencia": None,
-            })
-            continue
+            medicao = db.query(Medicao).filter(
+                Medicao.maquina_linha_id == m.id,
+                Medicao.timestamp_fim.isnot(None)
+            ).order_by(Medicao.timestamp_fim.desc()).first()
+            
+            if not medicao:
+                resultado.append({
+                    "maquina_id": m.id,
+                    "maquina_nome": m.nome,
+                    "ordem": m.ordem,
+                    "estado": "sem_informacao",
+                    "eficiencia": None,
+                    "producao": None,
+                    "velocidade": m.velocidade_nominal,
+                    "tempo_parado_ms": None,
+                    "mtbf_ms": None,
+                    "mttr_ms": None,
+                })
+                continue
 
-        # Calcula eficiência baseado nos eventos
-        eventos = db.query(Evento).filter(
-            Evento.medicao_id == medicao.id
-        ).order_by(Evento.timestamp).all()
+            # Tem medição finalizada
+            estado = "ultima_medicao"
+        else:
+            estado = None  # será calculado abaixo
 
         from datetime import datetime
         agora = datetime.now()
         inicio = medicao.timestamp_inicio
-        elapsed_ms = (agora - inicio).total_seconds() * 1000
+        fim = medicao.timestamp_fim or agora
+        elapsed_ms = (fim - inicio).total_seconds() * 1000
 
-        # Calcula tempo parado
+        # Calcula métricas pelos eventos
+        eventos = db.query(Evento).filter(
+            Evento.medicao_id == medicao.id
+        ).order_by(Evento.timestamp).all()
+
         stopped_ms = 0
         stop_time = None
         ultimo_estado = "rodando"
+        num_paradas = 0
 
         for ev in eventos:
             if ev.tipo == "parada":
                 stop_time = ev.timestamp
                 ultimo_estado = "parado"
+                num_paradas += 1
             elif ev.tipo == "marcha" and stop_time:
                 stopped_ms += (ev.timestamp - stop_time).total_seconds() * 1000
                 stop_time = None
                 ultimo_estado = "rodando"
 
-        # Se ainda parado, conta até agora
-        if stop_time:
+        if stop_time and estado != "ultima_medicao":
             stopped_ms += (agora - stop_time).total_seconds() * 1000
 
         running_ms = max(0, elapsed_ms - stopped_ms)
-        eficiencia = (running_ms / elapsed_ms * 100) if elapsed_ms > 0 else 0
+        eficiencia = round((running_ms / elapsed_ms * 100), 1) if elapsed_ms > 0 else 0
+
+        # Produção
+        producao = None
+        if medicao.producao_final is not None and medicao.producao_inicial is not None:
+            producao = medicao.producao_final - medicao.producao_inicial
+        elif medicao.producao_inicial is not None:
+            # Busca última leitura nos eventos
+            producao_eventos = [e for e in eventos if e.tipo == "production" and e.producao_leitura]
+            if producao_eventos:
+                producao = producao_eventos[-1].producao_leitura - medicao.producao_inicial
+
+        # MTBF e MTTR
+        mtbf_ms = (running_ms / num_paradas) if num_paradas > 0 else None
+        mttr_ms = (stopped_ms / num_paradas) if num_paradas > 0 else None
+
+        if estado != "ultima_medicao":
+            estado = ultimo_estado
 
         resultado.append({
             "maquina_id": m.id,
             "maquina_nome": m.nome,
             "ordem": m.ordem,
-            "estado": ultimo_estado,
-            "eficiencia": round(eficiencia, 1),
+            "estado": estado,
+            "eficiencia": eficiencia,
+            "producao": producao,
+            "velocidade": m.velocidade_nominal,
+            "tempo_parado_ms": round(stopped_ms),
+            "mtbf_ms": round(mtbf_ms) if mtbf_ms else None,
+            "mttr_ms": round(mttr_ms) if mttr_ms else None,
         })
 
     return resultado

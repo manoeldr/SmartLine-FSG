@@ -8,6 +8,7 @@ import { formatTime, formatTimeMM, formatPercent } from './utils.js';
 
 const PIE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6', '#ec4899'];
 let productionChart = null;
+let ultimoStatus = [];
 
 export function initOverview() {
   const m = store.measurement;
@@ -16,6 +17,7 @@ export function initOverview() {
   const badge = document.getElementById('ov-status-badge');
 
   productionChart = null;
+  ultimoStatus = [];
 
   if (!m.active && m.state !== 'finished') {
     noData.classList.remove('hidden');
@@ -115,6 +117,7 @@ export function updateOverview() {
 
 async function renderFluxoLinha() {
   const container = document.getElementById('ov-fluxo-linha');
+  const wrapper = document.getElementById('ov-fluxo-section');
   if (!container) return;
 
   const linhaId = store.config.linhaId;
@@ -125,6 +128,8 @@ async function renderFluxoLinha() {
 
   try {
     const status = await api.statusLinha(linhaId);
+    ultimoStatus = status;
+
     if (status.length === 0) {
       container.innerHTML = '<p class="empty-state-sm">Nenhuma máquina cadastrada</p>';
       return;
@@ -137,7 +142,6 @@ async function renderFluxoLinha() {
       const seta = i < status.length - 1
         ? `<span class="fluxo-seta ${estado}">→</span>`
         : '';
-
       return `
         <div class="fluxo-maquina">
           <div class="fluxo-maquina-box ${estado}">
@@ -150,9 +154,94 @@ async function renderFluxoLinha() {
         ${seta}
       `;
     }).join('');
+
+    // Configura clique para scroll aos cards — apenas uma vez
+    if (wrapper && !wrapper.dataset.clickAdded) {
+      wrapper.dataset.clickAdded = 'true';
+      wrapper.style.cursor = 'pointer';
+      wrapper.addEventListener('click', () => {
+        renderMaquinasCards(ultimoStatus);
+        document.getElementById('ov-maquinas-cards')?.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
+
   } catch {
     container.innerHTML = '<p class="empty-state-sm">Erro ao carregar fluxo</p>';
   }
+}
+
+// ============================================================
+// CARDS DETALHADOS DAS MÁQUINAS
+// ============================================================
+
+function renderMaquinasCards(statusList) {
+  const section = document.getElementById('ov-maquinas-cards');
+  const list = document.getElementById('ov-maquinas-cards-list');
+  if (!section || !list) return;
+
+  section.classList.remove('hidden');
+
+  const statusLabel = {
+    rodando: 'Rodando',
+    parado: 'Parada',
+    sem_informacao: 'Sem Informação',
+    ultima_medicao: 'Última Medição',
+  };
+
+  list.innerHTML = statusList.map(m => {
+    const label = statusLabel[m.estado] || '—';
+    const eficiencia = m.eficiencia !== null ? `${m.eficiencia}%` : '—';
+    const producao = m.producao !== null && m.producao !== undefined
+      ? m.producao.toLocaleString('pt-BR')
+      : '—';
+    const velocidade = m.velocidade !== null && m.velocidade !== undefined
+      ? `${m.velocidade.toLocaleString('pt-BR')} un/h`
+      : '—';
+    const tempoParado = m.tempo_parado_ms !== null && m.tempo_parado_ms !== undefined
+      ? formatTimeMM(m.tempo_parado_ms)
+      : '—';
+    const mtbf = m.mtbf_ms !== null && m.mtbf_ms !== undefined
+      ? formatTimeMM(m.mtbf_ms)
+      : '—';
+    const mttr = m.mttr_ms !== null && m.mttr_ms !== undefined
+      ? formatTimeMM(m.mttr_ms)
+      : '—';
+
+    return `
+      <div class="maquina-card">
+        <div class="maquina-card-header">
+          <span class="maquina-card-nome">${m.maquina_nome}</span>
+          <span class="maquina-card-status ${m.estado}">${label}</span>
+        </div>
+        <div class="maquina-card-metricas">
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Produção no turno</span>
+            <span class="maquina-metrica-value">${producao}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Velocidade</span>
+            <span class="maquina-metrica-value">${velocidade}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Tempo parado</span>
+            <span class="maquina-metrica-value">${tempoParado}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Eficiência</span>
+            <span class="maquina-metrica-value">${eficiencia}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">MTBF</span>
+            <span class="maquina-metrica-value">${mtbf}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">MTTR</span>
+            <span class="maquina-metrica-value">${mttr}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // ============================================================
