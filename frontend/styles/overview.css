@@ -47,3 +47,123 @@
   font-size: 0.8125rem;
   color: var(--text-dim);
 }
+
+/* ============================================================
+   FLUXO DA LINHA
+   ============================================================ */
+
+.fluxo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fluxo-legenda {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  align-items: center;
+}
+
+.fluxo-legenda span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fluxo-linha-wrapper {
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 20px 16px;
+  overflow-x: auto;
+}
+
+.fluxo-linha {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  min-width: max-content;
+}
+
+.fluxo-maquina {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.fluxo-maquina-box {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  border: 2.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  text-transform: uppercase;
+  position: relative;
+  background: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.fluxo-maquina-box.rodando {
+  border-color: var(--green);
+}
+
+.fluxo-maquina-box.parado {
+  border-color: var(--red);
+}
+
+.fluxo-maquina-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.fluxo-maquina-dot.rodando { background: var(--green); }
+.fluxo-maquina-dot.parado { background: var(--red); }
+
+.fluxo-maquina-nome {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fluxo-maquina-eficiencia {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.fluxo-maquina-eficiencia.rodando { color: var(--green); }
+.fluxo-maquina-eficiencia.parado { color: var(--red); }
+.fluxo-maquina-eficiencia.sem_medicao { color: var(--text-dim); }
+
+.fluxo-seta {
+  font-size: 1.25rem;
+  padding: 0 6px;
+  margin-bottom: 36px;
+  flex-shrink: 0;
+  color: var(--border);
+}
+
+.fluxo-seta.rodando { color: var(--green); }
+.fluxo-seta.parado { color: var(--red); }
+.fluxo-seta.sem_medicao { color: var(--border); }

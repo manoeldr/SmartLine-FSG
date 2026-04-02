@@ -1,30 +1,22 @@
 // ============================================================
 // OVERVIEW.JS — Tela de overview (visão geral da medição)
-// Mostra KPIs, barra de tempo rodando/parado, gráfico de pizza
-// por categoria de alarme, indicadores MTBF/MTTR, gráfico de
-// produção real vs nominal e botão de export.
 // ============================================================
 
 import { store } from './store.js';
+import { api } from './api.js';
 import { formatTime, formatTimeMM, formatPercent } from './utils.js';
 
-// Cores do gráfico de pizza — uma cor por categoria
 const PIE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6', '#ec4899'];
-
-// Instância do gráfico de produção (Chart.js)
 let productionChart = null;
 
-// Inicializa a tela de overview
 export function initOverview() {
   const m = store.measurement;
   const noData = document.getElementById('ov-no-data');
   const content = document.getElementById('ov-content');
   const badge = document.getElementById('ov-status-badge');
 
-  // Reseta o chart ao recarregar a página
   productionChart = null;
 
-  // Se não tem medição (nem ativa nem finalizada), mostra estado vazio
   if (!m.active && m.state !== 'finished') {
     noData.classList.remove('hidden');
     content.classList.add('hidden');
@@ -36,7 +28,6 @@ export function initOverview() {
   noData.classList.add('hidden');
   content.classList.remove('hidden');
 
-  // Badge de status no header
   if (m.state === 'running') {
     badge.textContent = 'Rodando'; badge.className = 'badge badge-green';
   } else if (m.state === 'stopped') {
@@ -45,12 +36,10 @@ export function initOverview() {
     badge.textContent = 'Finalizada'; badge.className = 'badge';
   }
 
-  // Preenche barra de informações (cliente, máquina, turno)
   document.getElementById('ov-client').textContent = store.config.client || '—';
   document.getElementById('ov-machine').textContent = store.config.machine || '—';
   document.getElementById('ov-shift').textContent = `${store.config.shiftStart} - ${store.config.shiftEnd}`;
 
-  // Botão de exportar JSON
   const exportBtn = document.getElementById('ov-export-btn');
   if (exportBtn) {
     exportBtn.onclick = () => {
@@ -65,10 +54,10 @@ export function initOverview() {
     };
   }
 
+  renderFluxoLinha();
   updateOverview();
 }
 
-// Atualiza todos os dados da tela (chamada a cada 1 segundo pelo main.js)
 export function updateOverview() {
   const m = store.measurement;
   if (!m.active && m.state !== 'finished') return;
@@ -78,29 +67,21 @@ export function updateOverview() {
   const stopped = store.getStoppedMs();
   const stops = store.getStops();
   const speed = store.config.speed || 1;
-  const productMultiplier = store.config.productMultiplier || 1;
   const displayProd = store.getDisplayProduction();
   const oeeProd = store.getProductionForOEE();
 
-  // KPIs principais
   document.getElementById('ov-elapsed').textContent = formatTime(elapsed);
   document.getElementById('ov-production').textContent = displayProd.toLocaleString('pt-BR');
 
-  // Disponibilidade
   const availability = elapsed > 0 ? (running / elapsed) * 100 : 0;
-
-  // Performance
   const runningHours = running / 3600000;
-  const expectedOutput = runningHours * speed * productMultiplier;
+  const expectedOutput = runningHours * speed;
   const performance = expectedOutput > 0 ? (oeeProd / expectedOutput) * 100 : 0;
-
-  // OEE
   const oee = (availability / 100) * (Math.min(performance, 100) / 100) * 100;
 
   document.getElementById('ov-efficiency').textContent = formatPercent(availability);
   document.getElementById('ov-oee').textContent = formatPercent(oee);
 
-  // Barra de tempo
   const runPct = elapsed > 0 ? (running / elapsed) * 100 : 100;
   const stopPct = elapsed > 0 ? (stopped / elapsed) * 100 : 0;
   document.getElementById('ov-bar-running').style.width = `${runPct}%`;
@@ -108,7 +89,6 @@ export function updateOverview() {
   document.getElementById('ov-running-time').textContent = formatTime(running);
   document.getElementById('ov-stopped-time').textContent = formatTime(stopped);
 
-  // Indicadores
   document.getElementById('ov-total-stops').textContent = stops.length;
 
   if (stops.length > 0) {
@@ -124,13 +104,59 @@ export function updateOverview() {
   document.getElementById('ov-availability').textContent = formatPercent(availability);
   document.getElementById('ov-performance').textContent = formatPercent(Math.min(performance, 100));
 
-  // Gráficos
   renderPieChart();
   renderProductionChart();
+  renderFluxoLinha();
 }
 
 // ============================================================
-// GRÁFICO DE PIZZA (DONUT) — Paradas por categoria
+// FLUXO DA LINHA
+// ============================================================
+
+async function renderFluxoLinha() {
+  const container = document.getElementById('ov-fluxo-linha');
+  if (!container) return;
+
+  const linhaId = store.config.linhaId;
+  if (!linhaId) {
+    container.innerHTML = '<p class="empty-state-sm">Linha não configurada</p>';
+    return;
+  }
+
+  try {
+    const status = await api.statusLinha(linhaId);
+    if (status.length === 0) {
+      container.innerHTML = '<p class="empty-state-sm">Nenhuma máquina cadastrada</p>';
+      return;
+    }
+
+    container.innerHTML = status.map((m, i) => {
+      const abrev = m.maquina_nome.substring(0, 4).toUpperCase();
+      const estado = m.estado;
+      const efText = m.eficiencia !== null ? `${m.eficiencia}%` : '—';
+      const seta = i < status.length - 1
+        ? `<span class="fluxo-seta ${estado}">→</span>`
+        : '';
+
+      return `
+        <div class="fluxo-maquina">
+          <div class="fluxo-maquina-box ${estado}">
+            <span class="fluxo-maquina-dot ${estado}"></span>
+            ${abrev}
+          </div>
+          <span class="fluxo-maquina-nome">${m.maquina_nome}</span>
+          <span class="fluxo-maquina-eficiencia ${estado}">${efText}</span>
+        </div>
+        ${seta}
+      `;
+    }).join('');
+  } catch {
+    container.innerHTML = '<p class="empty-state-sm">Erro ao carregar fluxo</p>';
+  }
+}
+
+// ============================================================
+// GRÁFICO DE PIZZA (DONUT)
 // ============================================================
 
 function renderPieChart() {
@@ -198,7 +224,7 @@ function renderPieChart() {
 }
 
 // ============================================================
-// GRÁFICO DE LINHA — Produção real vs nominal (Chart.js)
+// GRÁFICO DE LINHA — Produção real vs nominal
 // ============================================================
 
 function renderProductionChart() {
@@ -212,31 +238,24 @@ function renderProductionChart() {
   const speed = store.config.speed || 0;
   const startTime = new Date(m.startTime).getTime();
 
-  // Dados reais — subtrai produção inicial pra mostrar só o que foi produzido na medição
   const realValues = readings.map(r => r.value - (m.initialProduction || 0));
-
-  // Linha nominal — produção esperada no mesmo intervalo de tempo
   const nominalValues = readings.map(r => {
     const elapsedMin = (new Date(r.time).getTime() - startTime) / 60000;
     return Math.round((speed / 60) * elapsedMin);
   });
-
-  // Labels do eixo X em minutos
   const labels = readings.map(r => {
     const min = Math.round((new Date(r.time).getTime() - startTime) / 60000);
     return `${min}min`;
   });
 
-  // Se o chart já existe, apenas atualiza os dados
   if (productionChart) {
     productionChart.data.labels = labels;
     productionChart.data.datasets[0].data = realValues;
     productionChart.data.datasets[1].data = nominalValues;
-    productionChart.update('none'); // 'none' desativa animação na atualização
+    productionChart.update('none');
     return;
   }
 
-  // Cria o chart pela primeira vez
   productionChart = new Chart(canvas, {
     type: 'line',
     data: {
@@ -269,11 +288,7 @@ function renderProductionChart() {
       animation: false,
       plugins: {
         legend: {
-          labels: {
-            color: '#94a3b8',
-            font: { size: 12 },
-            usePointStyle: true,
-          }
+          labels: { color: '#94a3b8', font: { size: 12 }, usePointStyle: true }
         },
         tooltip: {
           callbacks: {
@@ -290,12 +305,7 @@ function renderProductionChart() {
           ticks: { color: '#94a3b8', font: { size: 11 } },
           grid: { color: 'rgba(148,163,184,0.08)' },
           beginAtZero: true,
-          title: {
-            display: true,
-            text: 'unidades',
-            color: '#64748b',
-            font: { size: 11 }
-          }
+          title: { display: true, text: 'unidades', color: '#64748b', font: { size: 11 } }
         }
       }
     }

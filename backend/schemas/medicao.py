@@ -8,6 +8,7 @@ class MedicaoCreate(BaseModel):
     turno_fim: str
     velocidade_nominal: float
     producao_inicial: int
+    maquina_linha_id: int | None = None
 
 class MedicaoUpdate(BaseModel):
     producao_final: int | None = None

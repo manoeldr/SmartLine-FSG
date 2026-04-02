@@ -42,6 +42,10 @@ export const api = {
     return request('POST', '/linhas/', { nome, cliente_id: clienteId });
   },
 
+  async statusLinha(linhaId) {
+    return request('GET', `/linhas/${linhaId}/status`);
+},
+
   // ── Máquinas da linha ────────────────────────────────────
   async listarMaquinas(linhaId) {
     return request('GET', `/linhas/${linhaId}/maquinas/`);
