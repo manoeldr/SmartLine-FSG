@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Integer, Float, ForeignKey
+from sqlalchemy import String, Integer, Float, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
 
@@ -13,7 +13,8 @@ class MaquinaLinha(Base):
     linha_id: Mapped[int] = mapped_column(Integer, ForeignKey("linhas.id"))
     velocidade_nominal: Mapped[float | None] = mapped_column(Float, nullable=True)
     multiplicador_produto: Mapped[float | None] = mapped_column(Float, nullable=True)
-    alarmes: Mapped[str | None] = mapped_column(String(2000), nullable=True)  # JSON string
+    alarmes: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    critica: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     linha: Mapped["Linha"] = relationship("Linha", back_populates="maquinas")
     medicoes: Mapped[list["Medicao"]] = relationship("Medicao", back_populates="maquina_linha")

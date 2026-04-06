@@ -16,6 +16,7 @@ let estadoConfig = {
 let carregandoLinhas = false;
 let carregandoMaquinas = false;
 
+// Inicializa a tela de configuração com um delay para garantir que o DOM está pronto.
 export function initConfig() {
   setTimeout(() => {
     configurarSelectCliente();
@@ -36,6 +37,8 @@ export function initConfig() {
 // SEÇÃO 1 — CLIENTE
 // ============================================================
 
+// Busca todos os clientes do backend e popula o select.
+// Se houver um clienteId salvo no store, restaura a seleção e carrega as linhas.
 async function carregarClientes() {
   const select = document.getElementById('cfg-cliente-select');
   const loading = document.getElementById('cfg-cliente-loading');
@@ -67,6 +70,8 @@ async function carregarClientes() {
   }
 }
 
+// Configura o listener do select de cliente.
+// Ao trocar o cliente, limpa linha e máquinas e salva o novo clienteId no store.
 function configurarSelectCliente() {
   const select = document.getElementById('cfg-cliente-select');
   if (!select || select.dataset.listenerAdded) return;
@@ -86,6 +91,8 @@ function configurarSelectCliente() {
   });
 }
 
+// Configura o botão de adicionar cliente.
+// Cria o cliente no backend, adiciona ao select e dispara o evento de change.
 function configurarBotaoAdicionarCliente() {
   const btn = document.getElementById('cfg-cliente-add-btn');
   if (!btn) return;
@@ -118,6 +125,8 @@ function configurarBotaoAdicionarCliente() {
 // SEÇÃO 2 — LINHA
 // ============================================================
 
+// Busca as linhas do cliente selecionado e popula o select.
+// Guard `carregandoLinhas` evita chamadas simultâneas que causariam duplicação.
 async function carregarLinhas(clienteId) {
   if (carregandoLinhas) return;
   carregandoLinhas = true;
@@ -150,6 +159,8 @@ async function carregarLinhas(clienteId) {
   }
 }
 
+// Configura o listener do select de linha.
+// Ao trocar a linha, limpa as máquinas e salva o novo linhaId no store imediatamente.
 function configurarSelectLinha() {
   const select = document.getElementById('cfg-linha-select');
   if (!select || select.dataset.listenerAdded) return;
@@ -162,6 +173,8 @@ function configurarSelectLinha() {
   });
 }
 
+// Configura o botão de adicionar linha.
+// Cria a linha no backend vinculada ao cliente atual e dispara o evento de change.
 function configurarBotaoAdicionarLinha() {
   const btn = document.getElementById('cfg-linha-add-btn');
   if (!btn) return;
@@ -190,6 +203,7 @@ function configurarBotaoAdicionarLinha() {
   });
 }
 
+// Reseta o select de linhas e oculta a seção. Também limpa as máquinas.
 function limparLinhas() {
   const select = document.getElementById('cfg-linha-select');
   const section = document.getElementById('cfg-linha-section');
@@ -202,6 +216,8 @@ function limparLinhas() {
 // SEÇÃO 3 — FLUXO DA LINHA (máquinas)
 // ============================================================
 
+// Busca as máquinas da linha e renderiza o fluxo.
+// Guard `carregandoMaquinas` evita chamadas simultâneas.
 async function carregarMaquinas(linhaId) {
   if (carregandoMaquinas) return;
   carregandoMaquinas = true;
@@ -220,6 +236,8 @@ async function carregarMaquinas(linhaId) {
   renderMaquinas();
 }
 
+// Configura o botão de adicionar máquina.
+// Define a ordem como o próximo número da sequência e cria no backend.
 function configurarBotaoAdicionarMaquina() {
   const btn = document.getElementById('cfg-maquina-add-btn');
   if (!btn) return;
@@ -244,6 +262,9 @@ function configurarBotaoAdicionarMaquina() {
   });
 }
 
+// Renderiza a lista de máquinas com drag-and-drop para reordenação.
+// Cada item tem botão ⋮ para configurar e × para remover.
+// Máquinas marcadas como críticas exibem um indicador visual (★).
 function renderMaquinas() {
   const list = document.getElementById('cfg-maquinas-list');
   if (estadoConfig.maquinas.length === 0) {
@@ -256,7 +277,8 @@ function renderMaquinas() {
       <span class="drag-handle">⠿</span>
       <span class="maquina-ordem">${m.ordem}</span>
       <span class="maquina-nome">${m.nome}</span>
-      <button type="button" class="btn-icon config-maquina" data-id="${m.id}" data-nome="${m.nome}" data-velocidade="${m.velocidade_nominal || ''}" data-multiplicador="${m.multiplicador_produto ?? 1}" data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
+      ${m.critica ? '<span style="color:var(--brand);font-size:1rem;margin-right:4px;">★</span>' : ''}
+      <button type="button" class="btn-icon config-maquina" data-id="${m.id}" data-nome="${m.nome}" data-velocidade="${m.velocidade_nominal || ''}" data-multiplicador="${m.multiplicador_produto ?? 1}" data-critica="${m.critica ? 'true' : 'false'}" data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
       <button type="button" class="btn-icon remove-maquina" data-id="${m.id}">×</button>
     </div>
   `).join('');
@@ -268,8 +290,9 @@ function renderMaquinas() {
       const nome = btn.dataset.nome;
       const velocidade = btn.dataset.velocidade;
       const multiplicador = btn.dataset.multiplicador;
+      const critica = btn.dataset.critica === 'true';
       const alarmes = JSON.parse(decodeURIComponent(btn.dataset.alarmes));
-      abrirModalConfigMaquina(id, nome, velocidade, multiplicador, alarmes);
+      abrirModalConfigMaquina(id, nome, velocidade, multiplicador, critica, alarmes);
     });
   });
 
@@ -343,6 +366,7 @@ function renderMaquinas() {
   });
 }
 
+// Limpa a lista de máquinas e oculta a seção do fluxo da linha.
 function limparMaquinas() {
   estadoConfig.maquinas = [];
   const section = document.getElementById('cfg-maquinas-section');
@@ -355,7 +379,10 @@ function limparMaquinas() {
 // MODAL: CONFIGURAR MÁQUINA
 // ============================================================
 
-function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1, alarmes) {
+// Abre o modal de configuração de uma máquina específica.
+// Permite editar: velocidade nominal, multiplicador de produto, crítica e alarmes.
+// Ao marcar como crítica, o backend desmarca automaticamente as demais da linha.
+function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1, critica = false, alarmes) {
   document.getElementById('modal-config-maquina')?.remove();
 
   const modal = document.createElement('div');
@@ -377,6 +404,19 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
         <p class="modal-sub" style="margin-top:4px;">Aplicado sobre velocidade nominal para cálculo de unidades finais.</p>
       </div>
 
+      <div class="theme-toggle-row" style="margin-bottom:16px;">
+        <div class="theme-toggle-info">
+          <span class="theme-toggle-label">Máquina crítica</span>
+          <span class="theme-toggle-value" id="modal-maq-critica-label">${critica ? 'Sim' : 'Não'}</span>
+        </div>
+        <button class="theme-toggle ${critica ? 'active' : ''}" id="modal-maq-critica-toggle" aria-label="Máquina crítica">
+          <span class="theme-toggle-thumb">
+            <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74z"/></svg>
+            <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74z"/></svg>
+          </span>
+        </button>
+      </div>
+
       <div class="form-group">
         <label>Alarmes / motivos de parada</label>
         <div id="modal-maq-alarm-list" style="margin-bottom:8px;"></div>
@@ -396,8 +436,20 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
   `;
   document.body.appendChild(modal);
 
+  // Estado local do toggle crítica
+  let criticaAtual = critica;
+  const toggle = document.getElementById('modal-maq-critica-toggle');
+  const label = document.getElementById('modal-maq-critica-label');
+
+  toggle.addEventListener('click', () => {
+    criticaAtual = !criticaAtual;
+    toggle.classList.toggle('active', criticaAtual);
+    label.textContent = criticaAtual ? 'Sim' : 'Não';
+  });
+
   let alarmesList = [...alarmes];
 
+  // Renderiza a lista de alarmes com botão de remoção por índice.
   function renderAlarmesList() {
     const list = document.getElementById('modal-maq-alarm-list');
     if (alarmesList.length === 0) {
@@ -420,6 +472,7 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
 
   renderAlarmesList();
 
+  // Adiciona novo alarme à lista local ao clicar no botão +.
   document.getElementById('modal-maq-add-alarm').addEventListener('click', () => {
     const input = document.getElementById('modal-maq-new-alarm');
     const cat = document.getElementById('modal-maq-new-alarm-cat').value;
@@ -432,6 +485,7 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
     input.value = '';
   });
 
+  // Salva todas as configurações da máquina no backend e atualiza o estado local.
   document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
     const velocidadeVal = parseFloat(document.getElementById('modal-maq-velocidade').value) || null;
     const multiplicadorVal = parseFloat(document.getElementById('modal-maq-multiplicador').value) || 1;
@@ -439,13 +493,21 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
       await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, {
         velocidade_nominal: velocidadeVal,
         multiplicador_produto: multiplicadorVal,
+        critica: criticaAtual,
         alarmes: JSON.stringify(alarmesList),
       });
       const m = estadoConfig.maquinas.find(m => m.id === maquinaId);
       if (m) {
         m.velocidade_nominal = velocidadeVal;
         m.multiplicador_produto = multiplicadorVal;
+        m.critica = criticaAtual;
         m.alarmes = JSON.stringify(alarmesList);
+        // Se marcou como crítica, desmarca as demais localmente
+        if (criticaAtual) {
+          estadoConfig.maquinas.forEach(maq => {
+            if (maq.id !== maquinaId) maq.critica = false;
+          });
+        }
       }
       modal.remove();
       renderMaquinas();
@@ -462,6 +524,7 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
 // SEÇÃO 4 — CONFIGURAÇÃO DA MEDIÇÃO
 // ============================================================
 
+// Preenche os campos da seção de medição com os valores salvos no store.
 function preencherConfigMedicao() {
   const cfg = store.config;
   const speedEl = document.getElementById('cfg-speed');
@@ -471,6 +534,7 @@ function preencherConfigMedicao() {
   document.getElementById('cfg-prod-interval').value = cfg.productionInterval || 30;
 }
 
+// Configura o botão salvar. Persiste cliente, linha, turno e intervalo no store.
 function configurarBotaoSalvar() {
   const btn = document.getElementById('cfg-save-btn');
   if (!btn) return;
@@ -489,6 +553,7 @@ function configurarBotaoSalvar() {
   });
 }
 
+// Configura o botão de reset. Apaga todos os dados da medição ativa após confirmação.
 function configurarBotaoReset() {
   const btn = document.getElementById('cfg-reset-btn');
   if (!btn) return;
@@ -504,6 +569,7 @@ function configurarBotaoReset() {
 // TEMA
 // ============================================================
 
+// Configura o toggle de tema claro/escuro. Persiste a preferência via store.
 function configurarTema() {
   const themeToggle = document.getElementById('cfg-theme-toggle');
   const themeLabel = document.getElementById('cfg-theme-label');
@@ -530,6 +596,8 @@ function configurarTema() {
 // ALARMES (globais — mantidos para compatibilidade)
 // ============================================================
 
+// Inicializa a seção de alarmes globais. Renderiza a lista existente e configura
+// os botões de adicionar e remover. Retorna silenciosamente se a seção estiver oculta.
 function configurarAlarmes() {
   const catSelect = document.getElementById('cfg-new-alarm-cat');
   if (!catSelect) return;
@@ -555,6 +623,7 @@ function configurarAlarmes() {
   });
 }
 
+// Renderiza a lista de alarmes globais agrupados por categoria.
 function renderAlarms() {
   const list = document.getElementById('cfg-alarm-list');
   if (!list) return;
@@ -591,6 +660,8 @@ function renderAlarms() {
 // TOAST
 // ============================================================
 
+// Exibe uma notificação temporária no topo da tela.
+// tipo: 'ok' (verde) | 'erro' (vermelho). Some após 2.5 segundos.
 function showToast(message, tipo = 'ok') {
   const existing = document.querySelector('.toast');
   if (existing) existing.remove();

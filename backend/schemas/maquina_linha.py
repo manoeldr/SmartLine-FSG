@@ -10,7 +10,8 @@ class MaquinaLinhaUpdate(BaseModel):
     ordem: int | None = None
     velocidade_nominal: float | None = None
     multiplicador_produto: float | None = None
-    alarmes: str | None = None  # JSON string
+    alarmes: str | None = None
+    critica: bool | None = None
 
 class MaquinaLinhaResponse(BaseModel):
     id: int
@@ -20,5 +21,6 @@ class MaquinaLinhaResponse(BaseModel):
     velocidade_nominal: float | None = None
     multiplicador_produto: float | None = None
     alarmes: str | None = None
+    critica: bool = False
 
     model_config = {"from_attributes": True}
