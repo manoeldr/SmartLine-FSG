@@ -138,6 +138,7 @@
 
 .fluxo-maquina-box.rodando { border-color: var(--green); }
 .fluxo-maquina-box.parado { border-color: var(--red); }
+.fluxo-maquina-box.ultima_medicao { border-color: var(--brand); }
 
 .fluxo-maquina-dot {
   position: absolute;
@@ -151,6 +152,7 @@
 
 .fluxo-maquina-dot.rodando { background: var(--green); }
 .fluxo-maquina-dot.parado { background: var(--red); }
+.fluxo-maquina-dot.ultima_medicao { background: var(--brand); }
 
 .fluxo-maquina-nome {
   font-size: 0.6875rem;

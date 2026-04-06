@@ -11,6 +11,7 @@ let productionChart = null;
 let ultimoStatus = [];
 let filtrosAtivos = {};
 let maquinasLinha = [];
+let isShowingFiltered = false;
 
 export function initOverview() {
   const m = store.measurement;
@@ -21,12 +22,22 @@ export function initOverview() {
   productionChart = null;
   ultimoStatus = [];
   filtrosAtivos = {};
+  isShowingFiltered = false;
 
   if (!m.active && m.state !== 'finished') {
-    noData.classList.remove('hidden');
-    content.classList.add('hidden');
-    badge.textContent = 'Aguardando';
-    badge.className = 'badge';
+    // Try to load last measurement
+    (async () => {
+      try {
+        const allMedicoes = await api.listarMedicoes({ linhaId: store.config.linhaId });
+        if (allMedicoes.length > 0) {
+          const medicao = await api.getMedicao(allMedicoes[0].id);
+          updateOverviewFromMedicao(medicao);
+          isShowingFiltered = true;
+          noData.classList.add('hidden');
+          content.classList.remove('hidden');
+        }
+      } catch {}
+    })();
     return;
   }
 
@@ -112,6 +123,7 @@ export function initOverview() {
 export function updateOverview() {
   const m = store.measurement;
   if (!m.active && m.state !== 'finished') return;
+  if (isShowingFiltered) return;
 
   const elapsed = store.getElapsedMs();
   const running = store.getRunningMs();
@@ -228,6 +240,23 @@ async function aplicarFiltros() {
   try {
     const medicoes = await api.listarMedicoes(filtrosAtivos);
     renderMedicoesHistoricas(medicoes);
+    if (medicoes.length > 0) {
+      const medicao = await api.getMedicao(medicoes[0].id);
+      updateOverviewFromMedicao(medicao);
+      isShowingFiltered = true;
+    } else {
+      // If no filters or no results, show last measurement
+      const allMedicoes = await api.listarMedicoes({ linhaId: store.config.linhaId });
+      if (allMedicoes.length > 0) {
+        const medicao = await api.getMedicao(allMedicoes[0].id);
+        updateOverviewFromMedicao(medicao);
+        isShowingFiltered = true;
+      } else {
+        // Fallback to current store
+        updateOverview();
+        isShowingFiltered = false;
+      }
+    }
   } catch {
     const list = document.getElementById('ov-maquinas-cards-list');
     if (list) list.innerHTML = '<p class="empty-state-sm">Erro ao buscar medições</p>';
@@ -290,6 +319,124 @@ function renderMedicoesHistoricas(medicoes) {
       </div>
     `;
   }).join('');
+}
+
+// ============================================================
+// ATUALIZAR OVERVIEW COM DADOS DE MEDIÇÃO HISTÓRICA
+// ============================================================
+
+function updateOverviewFromMedicao(medicao) {
+  const startTime = new Date(medicao.timestamp_inicio);
+  const endTime = medicao.timestamp_fim ? new Date(medicao.timestamp_fim) : new Date();
+  const elapsed = endTime - startTime;
+
+  // Sort events by timestamp
+  const events = medicao.eventos.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+  // Calculate running and stopped times
+  let runningMs = 0;
+  let stoppedMs = 0;
+  let currentState = 'running'; // assume starts running
+  let lastTime = startTime;
+
+  for (const event of events) {
+    const eventTime = new Date(event.timestamp);
+    if (currentState === 'running') {
+      runningMs += eventTime - lastTime;
+    } else {
+      stoppedMs += eventTime - lastTime;
+    }
+    currentState = event.tipo === 'marcha' ? 'running' : 'stopped';
+    lastTime = eventTime;
+  }
+
+  // Add remaining time
+  if (currentState === 'running') {
+    runningMs += endTime - lastTime;
+  } else {
+    stoppedMs += endTime - lastTime;
+  }
+
+  // Production readings
+  const productionReadings = events.filter(e => e.tipo === 'producao').map(e => ({
+    time: e.timestamp,
+    value: e.producao_leitura
+  }));
+  if (productionReadings.length === 0) {
+    productionReadings.push({ time: medicao.timestamp_inicio, value: medicao.producao_inicial });
+  }
+  const displayProd = productionReadings.length > 0 ? productionReadings[productionReadings.length - 1].value : 0;
+  const oeeProd = displayProd - medicao.producao_inicial;
+
+  // Stops
+  const stops = [];
+  for (let i = 0; i < events.length; i++) {
+    if (events[i].tipo === 'parada') {
+      const next = events.find((e, j) => j > i && (e.tipo === 'marcha' || e.tipo === 'start'));
+      const start = new Date(events[i].timestamp);
+      const end = next ? new Date(next.timestamp) : endTime;
+      stops.push({
+        reason: events[i].motivo || 'Não informado',
+        category: 'Interna', // default
+        start: events[i].timestamp,
+        end: next ? next.timestamp : medicao.timestamp_fim,
+        durationMs: end - start,
+      });
+    }
+  }
+
+  const availability = elapsed > 0 ? (runningMs / elapsed) * 100 : 0;
+  const runningHours = runningMs / 3600000;
+  const expectedOutput = runningHours * medicao.velocidade_nominal;
+  const performance = expectedOutput > 0 ? (oeeProd / expectedOutput) * 100 : 0;
+  const oee = (availability / 100) * (Math.min(performance, 100) / 100) * 100;
+
+  // Update display
+  document.getElementById('ov-elapsed').textContent = formatTime(elapsed);
+  document.getElementById('ov-production').textContent = displayProd.toLocaleString('pt-BR');
+  document.getElementById('ov-efficiency').textContent = formatPercent(availability);
+  document.getElementById('ov-oee').textContent = formatPercent(oee);
+
+  const runPct = elapsed > 0 ? (runningMs / elapsed) * 100 : 100;
+  const stopPct = elapsed > 0 ? (stoppedMs / elapsed) * 100 : 0;
+  document.getElementById('ov-bar-running').style.width = `${runPct}%`;
+  document.getElementById('ov-bar-stopped').style.width = `${stopPct}%`;
+  document.getElementById('ov-running-time').textContent = formatTime(runningMs);
+  document.getElementById('ov-stopped-time').textContent = formatTime(stoppedMs);
+
+  document.getElementById('ov-total-stops').textContent = stops.length;
+
+  if (stops.length > 0) {
+    const mtbf = runningMs / stops.length;
+    const avgStopMs = stoppedMs / stops.length;
+    document.getElementById('ov-mtbf').textContent = formatTimeMM(mtbf);
+    document.getElementById('ov-mttr').textContent = formatTimeMM(avgStopMs);
+  } else {
+    document.getElementById('ov-mtbf').textContent = '—';
+    document.getElementById('ov-mttr').textContent = '—';
+  }
+
+  document.getElementById('ov-availability').textContent = formatPercent(availability);
+  document.getElementById('ov-performance').textContent = formatPercent(Math.min(performance, 100));
+
+  // Update client, machine, shift
+  document.getElementById('ov-client').textContent = medicao.cliente;
+  document.getElementById('ov-machine').textContent = medicao.maquina;
+  document.getElementById('ov-shift').textContent = `${medicao.turno_inicio} - ${medicao.turno_fim}`;
+
+  // Update status badge
+  const badge = document.getElementById('ov-status-badge');
+  if (medicao.timestamp_fim) {
+    badge.textContent = 'Finalizada';
+    badge.className = 'badge';
+  } else {
+    badge.textContent = 'Ativa';
+    badge.className = 'badge badge-green';
+  }
+
+  // For charts, we can update similarly, but for now, skip or adapt
+  renderPieChartFromStops(stops);
+  renderProductionChartFromData(productionReadings, startTime.getTime(), medicao.velocidade_nominal, medicao.producao_inicial);
 }
 
 // ============================================================
@@ -484,22 +631,93 @@ function renderPieChart() {
   }).join('');
 }
 
+function renderPieChartFromStops(stops) {
+  const canvas = document.getElementById('ov-pie-chart');
+  const legend = document.getElementById('ov-pie-legend');
+  const noStopsMsg = document.getElementById('ov-no-stops-msg');
+  if (!canvas) return;
+
+  const byCategory = {};
+  for (const s of stops) {
+    const cat = 'Interna'; // default, since motivo is not category
+    if (!byCategory[cat]) byCategory[cat] = { count: 0, totalMs: 0 };
+    byCategory[cat].count++;
+    byCategory[cat].totalMs += s.durationMs;
+  }
+  const entries = Object.entries(byCategory);
+
+  if (entries.length === 0) {
+    canvas.style.display = 'none';
+    legend.innerHTML = '';
+    noStopsMsg.classList.remove('hidden');
+    return;
+  }
+
+  canvas.style.display = 'block';
+  noStopsMsg.classList.add('hidden');
+
+  const ctx = canvas.getContext('2d');
+  const total = entries.reduce((s, [, v]) => s + v.totalMs, 0);
+  const cx = 100, cy = 100, r = 80;
+
+  ctx.clearRect(0, 0, 200, 200);
+
+  let startAngle = -Math.PI / 2;
+  entries.forEach(([cat, data], i) => {
+    const sliceAngle = (data.totalMs / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle + sliceAngle);
+    ctx.closePath();
+    ctx.fillStyle = PIE_COLORS[i % PIE_COLORS.length];
+    ctx.fill();
+    startAngle += sliceAngle;
+  });
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 45, 0, Math.PI * 2);
+  const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim();
+  ctx.fillStyle = bgColor || '#111827';
+  ctx.fill();
+
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#f1f5f9';
+  ctx.font = 'bold 20px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(entries.reduce((s, [, v]) => s + v.count, 0), cx, cy - 6);
+
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#64748b';
+  ctx.fillText('paradas', cx, cy + 12);
+
+  legend.innerHTML = entries.map(([cat, data], i) => {
+    const pct = Math.round((data.totalMs / total) * 100);
+    const mins = Math.floor(data.totalMs / 60000);
+    return `<div class="pie-legend-item">
+      <span class="pie-legend-dot" style="background:${PIE_COLORS[i % PIE_COLORS.length]}"></span>
+      <span class="pie-legend-text">${cat}</span>
+      <span class="pie-legend-value">${data.count}x — ${mins}min (${pct}%)</span>
+    </div>`;
+  }).join('');
+}
+
 // ============================================================
 // GRÁFICO DE LINHA — Produção real vs nominal
 // ============================================================
 
 function renderProductionChart() {
-  const canvas = document.getElementById('ov-production-chart');
-  if (!canvas) return;
-
   const m = store.measurement;
   const readings = m.productionReadings || [];
   if (readings.length === 0) return;
 
-  const speed = store.config.speed || 0;
-  const startTime = new Date(m.startTime).getTime();
+  renderProductionChartFromData(readings, new Date(m.startTime).getTime(), store.config.speed || 0, m.initialProduction || 0);
+}
 
-  const realValues = readings.map(r => r.value - (m.initialProduction || 0));
+function renderProductionChartFromData(readings, startTime, speed, initialProduction) {
+  const canvas = document.getElementById('ov-production-chart');
+  if (!canvas) return;
+
+  const realValues = readings.map(r => r.value - initialProduction);
   const nominalValues = readings.map(r => {
     const elapsedMin = (new Date(r.time).getTime() - startTime) / 60000;
     return Math.round((speed / 60) * elapsedMin);

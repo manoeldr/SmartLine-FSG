@@ -184,6 +184,7 @@ export const store = {
     m.lastProductionPrompt = Date.now();
     m.events.push({ type: 'production', time: new Date().toISOString(), value });
     this.save();
+    if (m.medicaoId) api.registrarEvento(m.medicaoId, 'producao', null, value).catch(() => {});
   },
 
   getDisplayProduction() {

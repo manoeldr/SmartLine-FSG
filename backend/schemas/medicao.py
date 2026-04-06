@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
+from .evento import EventoResponse
 
 class MedicaoCreate(BaseModel):
     cliente: str
@@ -25,5 +26,6 @@ class MedicaoResponse(BaseModel):
     producao_final: int | None
     timestamp_inicio: datetime
     timestamp_fim: datetime | None
+    eventos: list[EventoResponse] = []
 
     model_config = {"from_attributes": True}

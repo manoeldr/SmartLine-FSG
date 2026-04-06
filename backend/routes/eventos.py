@@ -14,8 +14,8 @@ def registrar_evento(medicao_id: int, dados: EventoCreate, db: Session = Depends
         raise HTTPException(status_code=404, detail="Medição não encontrada")
     if medicao.timestamp_fim:
         raise HTTPException(status_code=400, detail="Medição já finalizada")
-    if dados.tipo not in ("marcha", "parada"):
-        raise HTTPException(status_code=422, detail="Tipo deve ser 'marcha' ou 'parada'")
+    if dados.tipo not in ("marcha", "parada", "producao"):
+        raise HTTPException(status_code=422, detail="Tipo deve ser 'marcha', 'parada' ou 'producao'")
 
     evento = Evento(medicao_id=medicao_id, **dados.model_dump())
     db.add(evento)

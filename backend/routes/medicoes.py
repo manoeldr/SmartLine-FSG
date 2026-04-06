@@ -1,6 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from backend.database import get_db
 from backend.models.medicao import Medicao
@@ -58,6 +58,7 @@ def listar_medicoes(
         except ValueError:
             pass
 
+    query = query.options(selectinload(Medicao.eventos))
     return query.order_by(Medicao.timestamp_inicio.desc()).all()
 
 @router.get("/filtros-disponiveis")
@@ -88,7 +89,7 @@ def filtros_disponiveis(linha_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{medicao_id}", response_model=MedicaoResponse)
 def buscar_medicao(medicao_id: int, db: Session = Depends(get_db)):
-    medicao = db.query(Medicao).filter(Medicao.id == medicao_id).first()
+    medicao = db.query(Medicao).options(selectinload(Medicao.eventos)).filter(Medicao.id == medicao_id).first()
     if not medicao:
         raise HTTPException(status_code=404, detail="Medição não encontrada")
     return medicao

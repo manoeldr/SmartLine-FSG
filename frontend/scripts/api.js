@@ -102,6 +102,10 @@ export const api = {
     return request('GET', `/medicoes/?${params.toString()}`);
   },
 
+  async getMedicao(id) {
+    return request('GET', `/medicoes/${id}`);
+  },
+
   // ── Filtros ──────────────────────────────────────────────
   async filtrosDisponiveis(linhaId) {
     return request('GET', `/medicoes/filtros-disponiveis?linha_id=${linhaId}`);
