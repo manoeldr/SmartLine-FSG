@@ -8,8 +8,6 @@ import { formatTime, formatTimeMM, vibrate } from './utils.js';
 
 let maquinaSelecionada = null;
 let currentMachineAlarms = [];
-let shiftEndCountdownInterval = null;
-let shiftEndAutoFinalizeTimeout = null;
 
 export function initMedicao() {
   const notConfigured = document.getElementById('med-not-configured');
@@ -72,13 +70,12 @@ function showActiveScreen() {
   updateButtonStates();
   updateMedicao();
 
-  replaceWithClone('btn-marcha',             el => el.addEventListener('click', handleMarcha));
-  replaceWithClone('btn-parada',             el => el.addEventListener('click', handleParada));
-  replaceWithClone('btn-confirm-production', el => el.addEventListener('click', handleConfirmProduction));
-  replaceWithClone('btn-confirm-reason',     el => el.addEventListener('click', handleConfirmReason));
-  replaceWithClone('btn-finalize',           el => el.addEventListener('click', () => showFinalizeModal()));
-  replaceWithClone('btn-confirm-finalize',   el => el.addEventListener('click', handleFinalize));
-  replaceWithClone('btn-cancel-finalize',    el => el.addEventListener('click', () => {
+  replaceWithClone('btn-marcha',           el => el.addEventListener('click', handleMarcha));
+  replaceWithClone('btn-parada',           el => el.addEventListener('click', handleParada));
+  replaceWithClone('btn-confirm-reason',   el => el.addEventListener('click', handleConfirmReason));
+  replaceWithClone('btn-finalize',         el => el.addEventListener('click', () => showFinalizeModal()));
+  replaceWithClone('btn-confirm-finalize', el => el.addEventListener('click', handleFinalize));
+  replaceWithClone('btn-cancel-finalize',  el => el.addEventListener('click', () => {
     document.getElementById('modal-finalize')?.classList.add('hidden');
   }));
   replaceWithClone('btn-add-custom-reason', el => el.addEventListener('click', async () => {
@@ -386,24 +383,6 @@ function handleConfirmReason() {
 }
 
 // ============================================================
-// MODAL: PRODUÇÃO PERIÓDICA
-// ============================================================
-
-function handleConfirmProduction() {
-  const input = document.getElementById('production-input');
-  const value = parseInt(input.value);
-  if (isNaN(value) || value < 0) { input.style.borderColor = 'var(--red)'; return; }
-  const lastReading = store.getLastReading();
-  if (lastReading && value < lastReading.value) {
-    if (!confirm(`Valor (${value}) menor que última leitura (${lastReading.value}). Confirma?`)) return;
-  }
-  store.addProductionReading(value);
-  if (input) { input.value = ''; input.style.borderColor = ''; }
-  document.getElementById('modal-production')?.classList.add('hidden');
-  vibrate([50]);
-}
-
-// ============================================================
 // ATUALIZAÇÃO VISUAL DOS BOTÕES
 // ============================================================
 
@@ -461,61 +440,6 @@ export function updateMedicao() {
     currentStopEl.style.color = currentStopMs > 0 ? 'var(--red)' : 'var(--text)';
   }
 
-  if (store.shouldPromptProduction()) {
-    vibrate([300, 100, 300, 100, 300]);
-    store.measurement.lastProductionPrompt = Date.now();
-    store.save();
-    const lastReading = store.getLastReading();
-    const input = document.getElementById('production-input');
-    if (input) input.placeholder = lastReading ? `Última: ${lastReading.value}` : 'Ex: 4500';
-    document.getElementById('modal-production')?.classList.remove('hidden');
-  }
-
-  if (store.shouldPromptShiftEnd()) {
-    vibrate([500, 200, 500]);
-    store.markShiftEndPrompted();
-    document.getElementById('modal-shift-end')?.classList.remove('hidden');
-    startShiftEndCountdown();
-  }
-}
-
-// ============================================================
-// COUNTDOWN AUTO-FINALIZAÇÃO (fim de turno)
-// ============================================================
-
-const SHIFT_END_AUTO_FINALIZE_MS = 5 * 60 * 1000; // 5 minutos
-
-function startShiftEndCountdown() {
-  clearShiftEndCountdown();
-
-  const countdownEl = document.getElementById('shift-end-countdown');
-  const deadline = Date.now() + SHIFT_END_AUTO_FINALIZE_MS;
-
-  function tick() {
-    const remaining = Math.max(0, deadline - Date.now());
-    const mins = Math.floor(remaining / 60000);
-    const secs = Math.floor((remaining % 60000) / 1000);
-    if (countdownEl) {
-      countdownEl.textContent = `Auto-finalizando em ${mins}:${String(secs).padStart(2, '0')}`;
-    }
-  }
-
-  tick();
-  shiftEndCountdownInterval = setInterval(tick, 1000);
-  shiftEndAutoFinalizeTimeout = setTimeout(() => {
-    clearShiftEndCountdown();
-    document.getElementById('modal-shift-end')?.classList.add('hidden');
-    store.finalizeMeasurement();
-    vibrate([200]);
-    showFinishedScreen();
-  }, SHIFT_END_AUTO_FINALIZE_MS);
-}
-
-function clearShiftEndCountdown() {
-  if (shiftEndCountdownInterval) { clearInterval(shiftEndCountdownInterval); shiftEndCountdownInterval = null; }
-  if (shiftEndAutoFinalizeTimeout) { clearTimeout(shiftEndAutoFinalizeTimeout); shiftEndAutoFinalizeTimeout = null; }
-  const countdownEl = document.getElementById('shift-end-countdown');
-  if (countdownEl) countdownEl.textContent = '';
 }
 
 // ============================================================
@@ -530,7 +454,7 @@ function showFinalizeModal() {
 }
 
 function handleFinalize() {
-  clearShiftEndCountdown();
+  window._clearShiftEndCountdown?.();
   const input = document.getElementById('final-production-input');
   const value = parseInt(input.value);
   if (!isNaN(value) && value >= 0) {
