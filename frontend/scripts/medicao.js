@@ -8,6 +8,8 @@ import { formatTime, formatTimeMM, vibrate } from './utils.js';
 
 let maquinaSelecionada = null;
 let currentMachineAlarms = [];
+let shiftEndCountdownInterval = null;
+let shiftEndAutoFinalizeTimeout = null;
 
 export function initMedicao() {
   const notConfigured = document.getElementById('med-not-configured');
@@ -104,11 +106,13 @@ function showActiveScreen() {
     if (input) input.value = '';
   }));
   replaceWithClone('btn-end-shift', el => el.addEventListener('click', () => {
+    clearShiftEndCountdown();
     store.markShiftEndPrompted();
     document.getElementById('modal-shift-end')?.classList.add('hidden');
     setTimeout(() => showFinalizeModal(), 300);
   }));
   replaceWithClone('btn-extend-shift', el => el.addEventListener('click', () => {
+    clearShiftEndCountdown();
     const input = document.getElementById('new-shift-end-input');
     if (input?.value) {
       store.updateConfig({ shiftEnd: input.value });
@@ -471,7 +475,47 @@ export function updateMedicao() {
     vibrate([500, 200, 500]);
     store.markShiftEndPrompted();
     document.getElementById('modal-shift-end')?.classList.remove('hidden');
+    startShiftEndCountdown();
   }
+}
+
+// ============================================================
+// COUNTDOWN AUTO-FINALIZAÇÃO (fim de turno)
+// ============================================================
+
+const SHIFT_END_AUTO_FINALIZE_MS = 5 * 60 * 1000; // 5 minutos
+
+function startShiftEndCountdown() {
+  clearShiftEndCountdown();
+
+  const countdownEl = document.getElementById('shift-end-countdown');
+  const deadline = Date.now() + SHIFT_END_AUTO_FINALIZE_MS;
+
+  function tick() {
+    const remaining = Math.max(0, deadline - Date.now());
+    const mins = Math.floor(remaining / 60000);
+    const secs = Math.floor((remaining % 60000) / 1000);
+    if (countdownEl) {
+      countdownEl.textContent = `Auto-finalizando em ${mins}:${String(secs).padStart(2, '0')}`;
+    }
+  }
+
+  tick();
+  shiftEndCountdownInterval = setInterval(tick, 1000);
+  shiftEndAutoFinalizeTimeout = setTimeout(() => {
+    clearShiftEndCountdown();
+    document.getElementById('modal-shift-end')?.classList.add('hidden');
+    store.finalizeMeasurement();
+    vibrate([200]);
+    showFinishedScreen();
+  }, SHIFT_END_AUTO_FINALIZE_MS);
+}
+
+function clearShiftEndCountdown() {
+  if (shiftEndCountdownInterval) { clearInterval(shiftEndCountdownInterval); shiftEndCountdownInterval = null; }
+  if (shiftEndAutoFinalizeTimeout) { clearTimeout(shiftEndAutoFinalizeTimeout); shiftEndAutoFinalizeTimeout = null; }
+  const countdownEl = document.getElementById('shift-end-countdown');
+  if (countdownEl) countdownEl.textContent = '';
 }
 
 // ============================================================
@@ -486,6 +530,7 @@ function showFinalizeModal() {
 }
 
 function handleFinalize() {
+  clearShiftEndCountdown();
   const input = document.getElementById('final-production-input');
   const value = parseInt(input.value);
   if (!isNaN(value) && value >= 0) {

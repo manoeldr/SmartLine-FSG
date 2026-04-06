@@ -49,6 +49,41 @@
 }
 
 /* ============================================================
+   FILTROS
+   ============================================================ */
+
+#ov-filter-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+#ov-filter-btn.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: rgba(25, 97, 192, 0.08);
+}
+
+.filter-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
    FLUXO DA LINHA
    ============================================================ */
 
@@ -59,20 +94,6 @@
   margin-bottom: 12px;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.fluxo-legenda {
-  display: flex;
-  gap: 12px;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  align-items: center;
-}
-
-.fluxo-legenda span {
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .fluxo-linha-wrapper {
@@ -115,13 +136,8 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
-.fluxo-maquina-box.rodando {
-  border-color: var(--green);
-}
-
-.fluxo-maquina-box.parado {
-  border-color: var(--red);
-}
+.fluxo-maquina-box.rodando { border-color: var(--green); }
+.fluxo-maquina-box.parado { border-color: var(--red); }
 
 .fluxo-maquina-dot {
   position: absolute;
@@ -155,6 +171,7 @@
 .fluxo-maquina-eficiencia.rodando { color: var(--green); }
 .fluxo-maquina-eficiencia.parado { color: var(--red); }
 .fluxo-maquina-eficiencia.sem_medicao { color: var(--text-dim); }
+.fluxo-maquina-eficiencia.ultima_medicao { color: var(--brand); }
 
 .fluxo-seta {
   font-size: 1.25rem;
@@ -167,6 +184,7 @@
 .fluxo-seta.rodando { color: var(--green); }
 .fluxo-seta.parado { color: var(--red); }
 .fluxo-seta.sem_medicao { color: var(--border); }
+.fluxo-seta.ultima_medicao { color: var(--brand); }
 
 /* ============================================================
    CARDS DETALHADOS DAS MÁQUINAS

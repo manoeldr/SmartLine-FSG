@@ -9,6 +9,8 @@ import { formatTime, formatTimeMM, formatPercent } from './utils.js';
 const PIE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#22c55e', '#8b5cf6', '#ec4899'];
 let productionChart = null;
 let ultimoStatus = [];
+let filtrosAtivos = {};
+let maquinasLinha = [];
 
 export function initOverview() {
   const m = store.measurement;
@@ -18,6 +20,7 @@ export function initOverview() {
 
   productionChart = null;
   ultimoStatus = [];
+  filtrosAtivos = {};
 
   if (!m.active && m.state !== 'finished') {
     noData.classList.remove('hidden');
@@ -56,6 +59,52 @@ export function initOverview() {
     };
   }
 
+  // Toggle do painel de filtros
+  const filterBtn = document.getElementById('ov-filter-btn');
+  const filterPanel = document.getElementById('ov-filter-panel');
+  if (filterBtn) {
+    filterBtn.onclick = () => {
+      filterPanel?.classList.toggle('hidden');
+      filterBtn.classList.toggle('active');
+    };
+  }
+
+  // Aplicar filtros
+  const btnAplicar = document.getElementById('ov-filter-aplicar');
+  if (btnAplicar) {
+    btnAplicar.onclick = async () => {
+      const linhaId = store.config.linhaId;
+      const maquinaId = document.getElementById('ov-filter-maquina')?.value;
+      const cliente = document.getElementById('ov-filter-cliente')?.value;
+      const turno = document.getElementById('ov-filter-turno')?.value;
+      const data = document.getElementById('ov-filter-data')?.value;
+
+      filtrosAtivos = { linhaId };
+      if (maquinaId) filtrosAtivos.maquinaLinhaId = maquinaId;
+      if (cliente) filtrosAtivos.cliente = cliente;
+      if (turno) filtrosAtivos.turnoInicio = turno;
+      if (data) { filtrosAtivos.dataInicio = data; filtrosAtivos.dataFim = data; }
+
+      await aplicarFiltros();
+      filterPanel?.classList.add('hidden');
+      const temFiltros = maquinaId || cliente || turno || data;
+      filterBtn?.classList.toggle('active', !!temFiltros);
+    };
+  }
+
+  // Limpar filtros
+  const btnLimpar = document.getElementById('ov-filter-limpar');
+  if (btnLimpar) {
+    btnLimpar.onclick = () => {
+      filtrosAtivos = {};
+      ['ov-filter-maquina', 'ov-filter-cliente', 'ov-filter-turno', 'ov-filter-data']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      filterBtn?.classList.remove('active');
+      filterPanel?.classList.add('hidden');
+    };
+  }
+
+  inicializarFiltros();
   renderFluxoLinha();
   updateOverview();
 }
@@ -109,6 +158,138 @@ export function updateOverview() {
   renderPieChart();
   renderProductionChart();
   renderFluxoLinha();
+  renderMaquinasCards(ultimoStatus);
+}
+
+// ============================================================
+// FILTROS
+// ============================================================
+
+async function inicializarFiltros() {
+  const linhaId = store.config.linhaId;
+  if (!linhaId) return;
+
+  try {
+    const [maquinas, filtros] = await Promise.all([
+      api.listarMaquinas(linhaId),
+      api.filtrosDisponiveis(linhaId),
+    ]);
+
+    maquinasLinha = maquinas;
+
+    const selMaquina = document.getElementById('ov-filter-maquina');
+    if (selMaquina) {
+      selMaquina.innerHTML = '<option value="">Todas</option>';
+      maquinas.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.nome;
+        selMaquina.appendChild(opt);
+      });
+    }
+
+    const selCliente = document.getElementById('ov-filter-cliente');
+    if (selCliente) {
+      selCliente.innerHTML = '<option value="">Todos</option>';
+      filtros.clientes.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        selCliente.appendChild(opt);
+      });
+    }
+
+    const selTurno = document.getElementById('ov-filter-turno');
+    if (selTurno) {
+      selTurno.innerHTML = '<option value="">Todos</option>';
+      filtros.turnos.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        selTurno.appendChild(opt);
+      });
+    }
+
+    const selData = document.getElementById('ov-filter-data');
+    if (selData) {
+      selData.innerHTML = '<option value="">Todas</option>';
+      filtros.datas.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = new Date(d + 'T12:00:00').toLocaleDateString('pt-BR');
+        selData.appendChild(opt);
+      });
+    }
+
+  } catch { maquinasLinha = []; }
+}
+
+async function aplicarFiltros() {
+  try {
+    const medicoes = await api.listarMedicoes(filtrosAtivos);
+    renderMedicoesHistoricas(medicoes);
+  } catch {
+    const list = document.getElementById('ov-maquinas-cards-list');
+    if (list) list.innerHTML = '<p class="empty-state-sm">Erro ao buscar medições</p>';
+  }
+}
+
+function renderMedicoesHistoricas(medicoes) {
+  const cards = document.getElementById('ov-maquinas-cards');
+  const list = document.getElementById('ov-maquinas-cards-list');
+  if (!cards || !list) return;
+
+  if (medicoes.length === 0) {
+    list.innerHTML = '<p class="empty-state-sm">Nenhuma medição encontrada com esses filtros</p>';
+    return;
+  }
+
+  list.innerHTML = medicoes.map(m => {
+    const duracao = m.timestamp_fim
+      ? formatTime(new Date(m.timestamp_fim) - new Date(m.timestamp_inicio))
+      : '—';
+    const producao = m.producao_final !== null && m.producao_inicial !== null
+      ? (m.producao_final - m.producao_inicial).toLocaleString('pt-BR')
+      : '—';
+    const data = new Date(m.timestamp_inicio).toLocaleDateString('pt-BR');
+    const status = m.timestamp_fim ? 'Finalizada' : 'Ativa';
+    const statusClass = m.timestamp_fim ? 'ultima_medicao' : 'rodando';
+
+    return `
+      <div class="maquina-card">
+        <div class="maquina-card-header">
+          <span class="maquina-card-nome">${m.maquina}</span>
+          <span class="maquina-card-status ${statusClass}">${status}</span>
+        </div>
+        <div class="maquina-card-metricas">
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Cliente</span>
+            <span class="maquina-metrica-value">${m.cliente}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Data</span>
+            <span class="maquina-metrica-value">${data}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Turno</span>
+            <span class="maquina-metrica-value">${m.turno_inicio} - ${m.turno_fim}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Duração</span>
+            <span class="maquina-metrica-value">${duracao}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Produção</span>
+            <span class="maquina-metrica-value">${producao}</span>
+          </div>
+          <div class="maquina-metrica">
+            <span class="maquina-metrica-label">Velocidade nominal</span>
+            <span class="maquina-metrica-value">${m.velocidade_nominal?.toLocaleString('pt-BR') || '—'} un/h</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // ============================================================
@@ -155,13 +336,11 @@ async function renderFluxoLinha() {
       `;
     }).join('');
 
-    // Configura clique para scroll aos cards — apenas uma vez
     if (wrapper && !wrapper.dataset.clickAdded) {
       wrapper.dataset.clickAdded = 'true';
       wrapper.style.cursor = 'pointer';
       wrapper.addEventListener('click', () => {
-        renderMaquinasCards(ultimoStatus);
-        document.getElementById('ov-maquinas-cards')?.scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('ov-maquinas-cards')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     }
 
@@ -179,8 +358,6 @@ function renderMaquinasCards(statusList) {
   const list = document.getElementById('ov-maquinas-cards-list');
   if (!section || !list) return;
 
-  section.classList.remove('hidden');
-
   const statusLabel = {
     rodando: 'Rodando',
     parado: 'Parada',
@@ -192,20 +369,15 @@ function renderMaquinasCards(statusList) {
     const label = statusLabel[m.estado] || '—';
     const eficiencia = m.eficiencia !== null ? `${m.eficiencia}%` : '—';
     const producao = m.producao !== null && m.producao !== undefined
-      ? m.producao.toLocaleString('pt-BR')
-      : '—';
+      ? m.producao.toLocaleString('pt-BR') : '—';
     const velocidade = m.velocidade !== null && m.velocidade !== undefined
-      ? `${m.velocidade.toLocaleString('pt-BR')} un/h`
-      : '—';
+      ? `${m.velocidade.toLocaleString('pt-BR')} un/h` : '—';
     const tempoParado = m.tempo_parado_ms !== null && m.tempo_parado_ms !== undefined
-      ? formatTimeMM(m.tempo_parado_ms)
-      : '—';
+      ? formatTimeMM(m.tempo_parado_ms) : '—';
     const mtbf = m.mtbf_ms !== null && m.mtbf_ms !== undefined
-      ? formatTimeMM(m.mtbf_ms)
-      : '—';
+      ? formatTimeMM(m.mtbf_ms) : '—';
     const mttr = m.mttr_ms !== null && m.mttr_ms !== undefined
-      ? formatTimeMM(m.mttr_ms)
-      : '—';
+      ? formatTimeMM(m.mttr_ms) : '—';
 
     return `
       <div class="maquina-card">

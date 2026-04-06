@@ -90,5 +90,22 @@ export const api = {
     console.log('listarMaquinasDisponiveis chamado com linhaId:', linhaId);
     return request('GET', `/linhas/${linhaId}/maquinas/disponiveis`);
   },
+
+  async listarMedicoes(filtros = {}) {
+    const params = new URLSearchParams();
+    if (filtros.linhaId) params.append('linha_id', filtros.linhaId);
+    if (filtros.maquinaLinhaId) params.append('maquina_linha_id', filtros.maquinaLinhaId);
+    if (filtros.cliente) params.append('cliente', filtros.cliente);
+    if (filtros.turnoInicio) params.append('turno_inicio', filtros.turnoInicio);
+    if (filtros.dataInicio) params.append('data_inicio', filtros.dataInicio);
+    if (filtros.dataFim) params.append('data_fim', filtros.dataFim);
+    return request('GET', `/medicoes/?${params.toString()}`);
+  },
+
+  // ── Filtros ──────────────────────────────────────────────
+  async filtrosDisponiveis(linhaId) {
+    return request('GET', `/medicoes/filtros-disponiveis?linha_id=${linhaId}`);
+  },
+
 };
 
