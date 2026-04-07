@@ -9,49 +9,45 @@ import { initOverview, updateOverview } from './overview.js';
 import { initMedicao, updateMedicao, cleanupMedicao } from './medicao.js';
 import { initParadas } from './paradas.js';
 import { initConfig } from './config.js';
+import { initDashboard, updateDashboard } from './dashboard.js';
 import { store } from './store.js';
 import { vibrate } from './utils.js';
 
 // Referências ao DOM
 const container = document.getElementById('page-container');
 const navButtons = document.querySelectorAll('.nav-btn');
-let currentPage = null; // Página ativa no momento
+let currentPage = null;
 
 console.log('main.js carregado', new Date().toISOString());
 
 // Carrega uma página dinamicamente via fetch do HTML
-// e inicializa o módulo JS correspondente
+// e inicializa o módulo JS correspondente.
 async function loadPage(name) {
   console.log('loadPage chamado:', name, 'currentPage:', currentPage, new Error().stack);
-  // Evita recarregar a mesma página
   if (currentPage === name) return;
 
-  // Limpa recursos da página anterior (se necessário)
   if (currentPage === 'medicao') cleanupMedicao();
 
   currentPage = name;
 
-  // Atualiza visual dos botões da navbar (destaca o ativo)
   navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.page === name));
 
   try {
-    // Carrega o HTML da página com cache desativado (vital para o Live Server)
     const resp = await fetch(`pages/${name}.html`, { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status} - Falha ao carregar página`);
 
     const html = await resp.text();
 
-    // Guard: se outra navegação ocorreu enquanto o fetch estava pendente, ignora
     if (currentPage !== name) return;
 
     container.innerHTML = html;
 
-    // Chama a função de inicialização da página carregada
     switch (name) {
-      case 'overview': initOverview(); break;
-      case 'medicao': initMedicao(); break;
-      case 'paradas': initParadas(); break;
-      case 'config': initConfig(); break;
+      case 'overview':  initOverview();  break;
+      case 'medicao':   initMedicao();   break;
+      case 'paradas':   initParadas();   break;
+      case 'config':    initConfig();    break;
+      case 'dashboard': initDashboard(); break;
     }
   } catch (e) {
     if (currentPage !== name) return;
@@ -60,7 +56,7 @@ async function loadPage(name) {
   }
 }
 
-// Configura os botões da navbar pra navegar entre páginas
+// Configura os botões da navbar para navegar entre páginas.
 navButtons.forEach(btn => {
   btn.addEventListener('click', (e) => {
     console.log('Nav clicado:', btn.dataset.page, 'target:', e.target, 'currentTarget:', e.currentTarget);
@@ -76,6 +72,7 @@ let shiftEndCountdownInterval = null;
 let shiftEndAutoFinalizeTimeout = null;
 const SHIFT_END_AUTO_FINALIZE_MS = 5 * 60 * 1000;
 
+// Limpa o countdown do fim de turno e cancela o timeout de auto-finalização.
 function clearShiftEndCountdown() {
   if (shiftEndCountdownInterval) { clearInterval(shiftEndCountdownInterval); shiftEndCountdownInterval = null; }
   if (shiftEndAutoFinalizeTimeout) { clearTimeout(shiftEndAutoFinalizeTimeout); shiftEndAutoFinalizeTimeout = null; }
@@ -83,6 +80,8 @@ function clearShiftEndCountdown() {
   if (el) el.textContent = '';
 }
 
+// Inicia o countdown regressivo de 5 minutos. Ao esgotar,
+// fecha o modal e finaliza a medição automaticamente.
 function startShiftEndCountdown() {
   clearShiftEndCountdown();
   const countdownEl = document.getElementById('shift-end-countdown');
@@ -106,11 +105,11 @@ function startShiftEndCountdown() {
   }, SHIFT_END_AUTO_FINALIZE_MS);
 }
 
-// Expõe clearShiftEndCountdown para medicao.js (handleFinalize)
+// Expõe clearShiftEndCountdown para uso em medicao.js (handleFinalize).
 window._clearShiftEndCountdown = clearShiftEndCountdown;
 
+// Inicializa os listeners dos modais globais de produção e fim de turno.
 function initGlobalModals() {
-  // Modal produção: confirmar leitura
   document.getElementById('btn-confirm-production')?.addEventListener('click', () => {
     const input = document.getElementById('production-input');
     const value = parseInt(input.value);
@@ -125,7 +124,6 @@ function initGlobalModals() {
     vibrate([50]);
   });
 
-  // Modal fim de turno: finalizar
   document.getElementById('btn-end-shift')?.addEventListener('click', () => {
     clearShiftEndCountdown();
     store.markShiftEndPrompted();
@@ -135,7 +133,6 @@ function initGlobalModals() {
     loadPage('medicao');
   });
 
-  // Modal fim de turno: estender
   document.getElementById('btn-extend-shift')?.addEventListener('click', () => {
     clearShiftEndCountdown();
     const input = document.getElementById('new-shift-end-input');
@@ -147,13 +144,13 @@ function initGlobalModals() {
   });
 }
 
-// Tick global: roda a cada 1 segundo pra atualizar timers,
-// verificar fim de turno e solicitar produção
+// Tick global: roda a cada 1 segundo para atualizar timers,
+// verificar fim de turno e solicitar leituras de produção.
 setInterval(() => {
-  if (currentPage === 'overview') updateOverview();
-  if (currentPage === 'medicao') updateMedicao();
+  if (currentPage === 'overview')  updateOverview();
+  if (currentPage === 'medicao')   updateMedicao();
+  if (currentPage === 'dashboard') updateDashboard();
 
-  // Verificações globais independentes da tela ativa
   if (store.measurement.active) {
     if (store.shouldPromptProduction()) {
       vibrate([300, 100, 300, 100, 300]);
@@ -174,7 +171,7 @@ setInterval(() => {
   }
 }, 1000);
 
-// Inicialização do app
+// Inicialização do app.
 store.init();
 store.applyTheme();
 initGlobalModals();

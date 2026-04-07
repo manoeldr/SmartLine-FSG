@@ -1,0 +1,4 @@
+/* Dashboard da linha — estilos específicos */
+
+.page-dashboard #db-producao { color: var(--brand-light); }
+.page-dashboard #db-eficiencia { color: var(--brand-light); }

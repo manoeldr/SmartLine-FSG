@@ -1,0 +1,82 @@
+<div class="page page-dashboard">
+  <header class="page-header">
+    <h1>Linha</h1>
+    <span class="badge" id="db-status-badge">Aguardando</span>
+  </header>
+
+  <div id="db-no-config" class="empty-state hidden">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+    <p>Linha não configurada</p>
+    <span>Vá em <strong>Config</strong> para selecionar cliente e linha</span>
+  </div>
+
+  <div id="db-content">
+
+    <!-- INFO BAR -->
+    <div class="info-bar">
+      <div class="info-item">
+        <span class="info-label">Cliente</span>
+        <span class="info-value" id="db-client">—</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">Máquinas ativas</span>
+        <span class="info-value" id="db-maquinas-ativas">—</span>
+      </div>
+    </div>
+
+    <!-- FLUXO DA LINHA -->
+    <div class="section-card" id="db-fluxo-section">
+      <div class="fluxo-header">
+        <div>
+          <h3 style="margin:0;text-transform:uppercase;font-size:0.75rem;letter-spacing:0.5px;">Fluxo da linha</h3>
+          <p style="font-size:0.7rem;color:var(--text-dim);margin:2px 0 0">Status em tempo real</p>
+        </div>
+      </div>
+      <div class="fluxo-linha-wrapper">
+        <div class="fluxo-linha" id="db-fluxo-linha">
+          <p class="empty-state-sm">Carregando...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPIs DA LINHA -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-highlight">
+        <span class="kpi-label">Produção</span>
+        <span class="kpi-value" id="db-producao">—</span>
+        <span class="kpi-unit">unidades</span>
+      </div>
+      <div class="kpi-card kpi-highlight">
+        <span class="kpi-label">Eficiência média</span>
+        <span class="kpi-value" id="db-eficiencia">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Total de paradas</span>
+        <span class="kpi-value" id="db-paradas">—</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Velocidade nominal</span>
+        <span class="kpi-value" id="db-velocidade">—</span>
+        <span class="kpi-unit">un/h</span>
+      </div>
+    </div>
+
+    <!-- INDICADORES -->
+    <div class="section-card">
+      <h3>Indicadores da linha</h3>
+      <div class="indicator-list">
+        <div class="indicator-row"><span>Máquina crítica</span><strong id="db-maquina-critica">—</strong></div>
+        <div class="indicator-row"><span>Estado crítica</span><strong id="db-estado-critica">—</strong></div>
+        <div class="indicator-row"><span>MTBF médio</span><strong id="db-mtbf">—</strong></div>
+        <div class="indicator-row"><span>MTTR médio</span><strong id="db-mttr">—</strong></div>
+      </div>
+    </div>
+
+    <!-- CARDS DETALHADOS -->
+    <div id="db-maquinas-cards" class="hidden">
+      <h3 style="margin-bottom:12px;">Detalhes das máquinas</h3>
+      <div id="db-maquinas-cards-list"></div>
+    </div>
+
+  </div>
+</div>

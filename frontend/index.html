@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>BottleLine Audit</title>
+  <title>SmartLine</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles/main.css">
 </head>
@@ -19,12 +19,18 @@
     <nav id="navbar">
       <button class="nav-btn active" data-page="overview">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        <span>Overview</span>
+        <span>Auditoria</span>
       </button>
       <button class="nav-btn" data-page="medicao">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <span>Medição</span>
       </button>
+
+      <!-- Botão central — Dashboard da linha (símbolo SanMartin) -->
+      <button class="nav-btn nav-btn-center" data-page="dashboard">
+        <img src="icons/sanmartin.svg" width="30" height="30" alt="Dashboard">
+      </button>
+
       <button class="nav-btn" data-page="paradas">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <span>Paradas</span>
@@ -60,6 +66,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="scripts/main.js?v=3" type="module"></script>
+  <script src="scripts/main.js?v=4" type="module"></script>
 </body>
 </html>
