@@ -19,6 +19,7 @@
         <span class="med-timer-sub" id="med-machine-name-pre">Selecione uma máquina para começar</span>
       </div>
       <button class="btn btn-primary btn-block" id="btn-start-measurement" style="margin-top: 16px;">Iniciar medição</button>
+      <button class="btn btn-outline btn-block hidden" id="btn-retomar-medicao" style="margin-top: 8px;">Retomar medição anterior</button>
     </div>
 
     <!-- MEDIÇÃO ATIVA -->
@@ -103,6 +104,16 @@
     </div>
   </div>
 
+  <!-- MODAL: RETOMAR MEDIÇÃO -->
+  <div class="modal-overlay hidden" id="modal-retomar-medicao">
+    <div class="modal">
+      <h3>Retomar medição</h3>
+      <p class="modal-sub">Selecione a medição que deseja continuar</p>
+      <div id="modal-retomar-list" style="margin-bottom:16px;"></div>
+      <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-retomar">Cancelar</button>
+    </div>
+  </div>
+
   <!-- MODAL: MOTIVO DA PARADA -->
   <div class="modal-overlay hidden" id="modal-stop-reason">
     <div class="modal">
@@ -120,7 +131,6 @@
       <button class="btn btn-primary" id="btn-confirm-reason">Confirmar</button>
     </div>
   </div>
-
 
   <!-- MODAL: FINALIZAR -->
   <div class="modal-overlay hidden" id="modal-finalize">

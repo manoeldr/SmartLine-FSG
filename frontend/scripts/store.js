@@ -8,7 +8,9 @@ import { api } from './api.js';
 // ============================================================
 
 const STORAGE_KEY = 'bottleline_data';
+const SYNC_INTERVAL_MS = 5 * 60 * 1000; // 5 minutos
 
+// Retorna a estrutura padrão de dados do app.
 const defaultData = () => ({
   config: {
     client: '',
@@ -16,7 +18,9 @@ const defaultData = () => ({
     machine: '',
     maquinaLinhaId: null,
     linhaId: null,
-    speed: 0,    productMultiplier: 1,    shiftStart: '08:00',
+    speed: 0,
+    productMultiplier: 1,
+    shiftStart: '08:00',
     shiftEnd: '17:00',
     alarmCategories: ['Interna', 'Externa'],
     alarms: [
@@ -42,12 +46,17 @@ const defaultData = () => ({
     productionReadings: [],
     lastProductionPrompt: null,
     medicaoId: null,
+    lastSyncedEventIndex: 0,
+    lastSyncTime: null,
   },
 });
 
 export const store = {
   _data: null,
+  _syncTimer: null,
 
+  // Inicializa o store carregando dados do localStorage.
+  // Faz migrações de compatibilidade para campos novos e inicia o timer de sync.
   init() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -58,10 +67,12 @@ export const store = {
         if (!this._data.config) this._data.config = def.config;
         if (!this._data.measurement) this._data.measurement = def.measurement;
 
+        // Migração: alarmes antigos como strings para objetos
         if (this._data.config.alarms && this._data.config.alarms.length > 0 && typeof this._data.config.alarms[0] === 'string') {
           this._data.config.alarms = this._data.config.alarms.map(a => ({ name: a, category: 'Interna' }));
         }
 
+        // Migração: campos novos com valores padrão
         if (!this._data.config.alarmCategories) this._data.config.alarmCategories = def.config.alarmCategories;
         if (!this._data.config.theme) this._data.config.theme = def.config.theme;
         if (!this._data.config.productionInterval) this._data.config.productionInterval = def.config.productionInterval;
@@ -70,6 +81,8 @@ export const store = {
         if (this._data.config.maquinaLinhaId === undefined) this._data.config.maquinaLinhaId = null;
         if (this._data.config.productMultiplier === undefined) this._data.config.productMultiplier = 1;
         if (this._data.measurement.medicaoId === undefined) this._data.measurement.medicaoId = null;
+        if (this._data.measurement.lastSyncedEventIndex === undefined) this._data.measurement.lastSyncedEventIndex = 0;
+        if (this._data.measurement.lastSyncTime === undefined) this._data.measurement.lastSyncTime = null;
       } catch {
         this._data = defaultData();
       }
@@ -77,15 +90,21 @@ export const store = {
       this._data = defaultData();
     }
     this.save();
+
+    // Inicia o timer de sincronização periódica com o backend
+    this._startSyncTimer();
   },
 
+  // Persiste o estado atual no localStorage.
   save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(this._data)); },
 
   get config() { return this._data.config; },
   get measurement() { return this._data.measurement; },
 
+  // Atualiza campos parciais da configuração e persiste.
   updateConfig(partial) { Object.assign(this._data.config, partial); this.save(); },
 
+  // Adiciona um alarme à lista global se ainda não existir.
   addAlarm(name, category) {
     if (name && !this._data.config.alarms.find(a => a.name === name)) {
       this._data.config.alarms.push({ name, category: category || 'Interna' });
@@ -93,8 +112,10 @@ export const store = {
     }
   },
 
+  // Remove um alarme da lista global pelo índice.
   removeAlarm(index) { this._data.config.alarms.splice(index, 1); this.save(); },
 
+  // Adiciona uma categoria de alarme se ainda não existir.
   addAlarmCategory(cat) {
     if (cat && !this._data.config.alarmCategories.includes(cat)) {
       this._data.config.alarmCategories.push(cat);
@@ -102,15 +123,115 @@ export const store = {
     }
   },
 
+  // Verifica se o app está configurado com cliente, linha e velocidade.
   isConfigured() {
     const c = this._data.config;
-    return c.client && c.linhaId && c.speed > 0;
+    return c.client && c.linhaId;
+  },
+
+  // ============================================================
+  // SINCRONIZAÇÃO COM O BACKEND
+  // ============================================================
+
+  // Inicia o timer de sincronização periódica a cada 5 minutos.
+  _startSyncTimer() {
+    if (this._syncTimer) clearInterval(this._syncTimer);
+    this._syncTimer = setInterval(() => {
+      if (this._data.measurement.active && this._data.measurement.medicaoId) {
+        this.syncToBackend().catch(() => {});
+      }
+    }, SYNC_INTERVAL_MS);
+  },
+
+  // Envia para o backend os eventos ainda não sincronizados desde o último sync.
+  // Controla o índice do último evento sincronizado para evitar duplicatas.
+  async syncToBackend() {
+    const m = this._data.measurement;
+    if (!m.medicaoId || !m.active) return;
+
+    const events = m.events;
+    const lastIdx = m.lastSyncedEventIndex || 0;
+    const pending = events.slice(lastIdx);
+
+    for (const ev of pending) {
+      try {
+        if (ev.type === 'marcha') {
+          await api.registrarEvento(m.medicaoId, 'marcha', ev.reason || null);
+        } else if (ev.type === 'stop') {
+          await api.registrarEvento(m.medicaoId, 'parada', ev.reason || null);
+        } else if (ev.type === 'production') {
+          await api.registrarEvento(m.medicaoId, 'producao', null, ev.value);
+        }
+      } catch {
+        // Para no primeiro erro — tentará novamente no próximo ciclo
+        break;
+      }
+      m.lastSyncedEventIndex = (m.lastSyncedEventIndex || 0) + 1;
+    }
+
+    m.lastSyncTime = new Date().toISOString();
+    this.save();
+  },
+
+  // Restaura uma medição específica pelo ID com os dados passados diretamente.
+  // Usado quando o auditor escolhe manualmente qual medição retomar na tela de Medição.
+  async restoreFromBackendById(medicaoId, dados) {
+    try {
+      const resultado = await api.medicaoAtiva(dados.maquinaLinhaId);
+      const eventos = resultado?.eventos || [];
+
+      const m = this._data.measurement;
+      const eventsLocal = [];
+      let ultimoEstado = 'running';
+      const productionReadings = [{ time: new Date().toISOString(), value: dados.producaoInicial }];
+
+      for (const ev of eventos) {
+        if (ev.tipo === 'marcha') {
+          eventsLocal.push({ type: 'marcha', time: ev.timestamp });
+          ultimoEstado = 'running';
+        } else if (ev.tipo === 'parada') {
+          eventsLocal.push({ type: 'stop', time: ev.timestamp, reason: ev.motivo || null, category: null });
+          ultimoEstado = 'stopped';
+        } else if (ev.tipo === 'producao' && ev.producao_leitura !== null) {
+          eventsLocal.push({ type: 'production', time: ev.timestamp, value: ev.producao_leitura });
+          productionReadings.push({ time: ev.timestamp, value: ev.producao_leitura });
+        }
+      }
+
+      m.active = true;
+      m.started = true;
+      m.state = ultimoEstado;
+      m.startTime = resultado.medicao?.timestamp_inicio || eventos[0]?.timestamp || new Date().toISOString();
+      m.endTime = null;
+      m.shiftEndPrompted = false;
+      m.medicaoId = medicaoId;
+      m.initialProduction = dados.producaoInicial;
+      m.productionReadings = productionReadings;
+      m.events = eventsLocal;
+      m.lastSyncedEventIndex = eventsLocal.length;
+      m.lastSyncTime = new Date().toISOString();
+      m.lastProductionPrompt = Date.now();
+
+      this._data.config.machine = dados.maquina;
+      this._data.config.maquinaLinhaId = dados.maquinaLinhaId;
+      this._data.config.shiftStart = dados.turnoInicio;
+      this._data.config.shiftEnd = dados.turnoFim;
+      this._data.config.speed = dados.velocidade;
+      if (dados.cliente) this._data.config.client = dados.cliente;
+      if (dados.linhaId) this._data.config.linhaId = dados.linhaId;
+
+      this.save();
+      console.log(`[store] Medição #${medicaoId} restaurada manualmente.`);
+    } catch (e) {
+      console.warn('[store] Erro ao restaurar medição por ID:', e);
+    }
   },
 
   // ============================================================
   // MÉTODOS DE MEDIÇÃO
   // ============================================================
 
+  // Inicia uma nova medição: reseta o estado, cria no backend e inicia o tracking.
   startMeasurement(initialProduction) {
     const m = this._data.measurement;
     m.active = true;
@@ -124,6 +245,8 @@ export const store = {
     m.productionReadings = [{ time: new Date().toISOString(), value: initialProduction }];
     m.lastProductionPrompt = Date.now();
     m.medicaoId = null;
+    m.lastSyncedEventIndex = 0;
+    m.lastSyncTime = null;
     this.save();
 
     const cfg = this._data.config;
@@ -138,19 +261,23 @@ export const store = {
     }).then(resultado => {
       if (resultado?.id) {
         this._data.measurement.medicaoId = resultado.id;
+        this._data.measurement.lastSyncedEventIndex = 1;
         this.save();
       }
     }).catch(() => {});
   },
 
+  // Registra evento de marcha no estado local e envia ao backend imediatamente.
   setMarcha() {
     const m = this._data.measurement;
     m.state = 'running';
     m.events.push({ type: 'marcha', time: new Date().toISOString() });
+    m.lastSyncedEventIndex = m.events.length;
     this.save();
     if (m.medicaoId) api.registrarEvento(m.medicaoId, 'marcha').catch(() => {});
   },
 
+  // Atualiza o motivo e categoria da última parada registrada.
   setStopReason(reason, category = null) {
     const m = this._data.measurement;
     const lastStop = [...m.events].reverse().find(e => e.type === 'stop');
@@ -161,15 +288,18 @@ export const store = {
     }
   },
 
+  // Retorna a categoria de um alarme pelo nome, ou 'Interna' se não encontrado.
   getAlarmCategory(alarmName) {
     const alarm = this._data.config.alarms.find(a => a.name === alarmName);
     return alarm ? alarm.category : 'Interna';
   },
 
+  // Registra evento de parada no estado local e envia ao backend imediatamente.
   setParada() {
     const m = this._data.measurement;
     m.state = 'stopped';
     m.events.push({ type: 'stop', time: new Date().toISOString(), reason: null, category: null });
+    m.lastSyncedEventIndex = m.events.length;
     this.save();
     if (m.medicaoId) api.registrarEvento(m.medicaoId, 'parada').catch(() => {});
   },
@@ -178,27 +308,32 @@ export const store = {
   // MÉTODOS DE PRODUÇÃO
   // ============================================================
 
+  // Adiciona uma leitura de produção ao histórico e envia ao backend.
   addProductionReading(value) {
     const m = this._data.measurement;
     m.productionReadings.push({ time: new Date().toISOString(), value });
     m.lastProductionPrompt = Date.now();
     m.events.push({ type: 'production', time: new Date().toISOString(), value });
+    m.lastSyncedEventIndex = m.events.length;
     this.save();
     if (m.medicaoId) api.registrarEvento(m.medicaoId, 'producao', null, value).catch(() => {});
   },
 
+  // Retorna o valor da última leitura de produção registrada.
   getDisplayProduction() {
     const m = this._data.measurement;
     if (!m.productionReadings || m.productionReadings.length === 0) return 0;
     return m.productionReadings[m.productionReadings.length - 1].value;
   },
 
+  // Retorna a produção líquida do turno (última leitura menos produção inicial).
   getProductionForOEE() {
     const m = this._data.measurement;
     if (!m.productionReadings || m.productionReadings.length === 0) return 0;
     return m.productionReadings[m.productionReadings.length - 1].value - (m.initialProduction || 0);
   },
 
+  // Retorna o objeto da última leitura de produção.
   getLastReading() {
     const m = this._data.measurement;
     if (!m.productionReadings || m.productionReadings.length === 0) return null;
@@ -209,6 +344,7 @@ export const store = {
   // MÉTODOS DE PARADAS
   // ============================================================
 
+  // Calcula e retorna a lista de paradas com duração, motivo e categoria.
   getStops() {
     const m = this._data.measurement;
     const events = m.events;
@@ -231,6 +367,7 @@ export const store = {
     return stops;
   },
 
+  // Agrupa as paradas por categoria com contagem e tempo total.
   getStopsByCategory() {
     const stops = this.getStops();
     const grouped = {};
@@ -242,6 +379,7 @@ export const store = {
     return grouped;
   },
 
+  // Retorna o tempo em ms da parada atual (0 se não estiver parado).
   getCurrentStopMs() {
     const m = this._data.measurement;
     if (m.state !== 'stopped') return 0;
@@ -255,6 +393,7 @@ export const store = {
   // MÉTODOS DE TEMPO
   // ============================================================
 
+  // Retorna o tempo total decorrido desde o início da medição em ms.
   getElapsedMs() {
     const m = this._data.measurement;
     if (!m.startTime) return 0;
@@ -262,10 +401,12 @@ export const store = {
     return end - new Date(m.startTime).getTime();
   },
 
+  // Retorna o tempo total em que a máquina ficou rodando (elapsed - parado).
   getRunningMs() {
     return Math.max(0, this.getElapsedMs() - this.getStoppedMs());
   },
 
+  // Retorna o tempo total acumulado de todas as paradas em ms.
   getStoppedMs() {
     return this.getStops().reduce((sum, s) => sum + s.durationMs, 0);
   },
@@ -274,6 +415,7 @@ export const store = {
   // VERIFICAÇÕES PERIÓDICAS
   // ============================================================
 
+  // Verifica se é hora de solicitar uma nova leitura de produção.
   shouldPromptProduction() {
     const m = this._data.measurement;
     if (!m.active || m.state !== 'running') return false;
@@ -281,6 +423,7 @@ export const store = {
     return Date.now() - (m.lastProductionPrompt || 0) >= interval;
   },
 
+  // Verifica se o horário de fim de turno foi atingido e ainda não foi tratado.
   shouldPromptShiftEnd() {
     const m = this._data.measurement;
     if (!m.active || m.shiftEndPrompted) return false;
@@ -292,11 +435,13 @@ export const store = {
     return now >= endToday;
   },
 
+  // Marca que o modal de fim de turno já foi exibido para este turno.
   markShiftEndPrompted() {
     this._data.measurement.shiftEndPrompted = true;
     this.save();
   },
 
+  // Reseta a flag de fim de turno (usado ao estender o turno).
   resetShiftEndPrompted() {
     this._data.measurement.shiftEndPrompted = false;
     this.save();
@@ -306,11 +451,13 @@ export const store = {
   // FINALIZAÇÃO E RESET
   // ============================================================
 
+  // Reseta completamente o estado da medição para os valores padrão.
   resetMeasurement() {
     this._data.measurement = defaultData().measurement;
     this.save();
   },
 
+  // Finaliza a medição: marca como encerrada, persiste e envia ao backend.
   finalizeMeasurement() {
     const m = this._data.measurement;
     m.active = false;
@@ -323,6 +470,7 @@ export const store = {
     }
   },
 
+  // Exporta todos os dados da medição atual como JSON formatado.
   exportJSON() {
     return JSON.stringify({
       config: this._data.config,
@@ -339,9 +487,12 @@ export const store = {
   // TEMA VISUAL
   // ============================================================
 
+  // Retorna o tema atual ('dark' ou 'light').
   getTheme() { return this._data.config.theme || 'dark'; },
 
+  // Define e aplica o tema, persistindo no store.
   setTheme(theme) { this._data.config.theme = theme; this.save(); this.applyTheme(); },
 
+  // Aplica o tema atual ao documento via atributo data-theme.
   applyTheme() { document.documentElement.setAttribute('data-theme', this.getTheme()); },
 };

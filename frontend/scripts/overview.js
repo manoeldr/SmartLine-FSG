@@ -12,6 +12,8 @@ let ultimoStatus = [];
 let filtrosAtivos = {};
 let maquinasLinha = [];
 let isShowingFiltered = false;
+let lastFluxoUpdateTime = 0;
+const FLUXO_UPDATE_INTERVAL_MS = 30_000;
 
 export function initOverview() {
   const m = store.measurement;
@@ -23,6 +25,7 @@ export function initOverview() {
   ultimoStatus = [];
   filtrosAtivos = {};
   isShowingFiltered = false;
+  lastFluxoUpdateTime = 0;
 
   if (!m.active && m.state !== 'finished') {
     // Try to load last measurement
@@ -116,6 +119,7 @@ export function initOverview() {
   }
 
   inicializarFiltros();
+  lastFluxoUpdateTime = Date.now();
   renderFluxoLinha();
   updateOverview();
 }
@@ -169,8 +173,13 @@ export function updateOverview() {
 
   renderPieChart();
   renderProductionChart();
-  renderFluxoLinha();
   renderMaquinasCards(ultimoStatus);
+
+  const now = Date.now();
+  if (now - lastFluxoUpdateTime >= FLUXO_UPDATE_INTERVAL_MS) {
+    lastFluxoUpdateTime = now;
+    renderFluxoLinha();
+  }
 }
 
 // ============================================================

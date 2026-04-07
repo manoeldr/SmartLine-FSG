@@ -135,6 +135,11 @@ export const api = {
     return request('GET', `/medicoes/${id}`);
   },
 
+  // Retorna a medição ativa de uma máquina e seus eventos.
+  async medicaoAtiva(maquinaLinhaId) {
+    return request('GET', `/medicoes/ativa?maquina_linha_id=${maquinaLinhaId}`);
+  },
+
   // ── Filtros ──────────────────────────────────────────────
 
   // Retorna os valores disponíveis para filtros no overview:

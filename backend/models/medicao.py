@@ -20,3 +20,7 @@ class Medicao(Base):
 
     eventos: Mapped[list["Evento"]] = relationship("Evento", back_populates="medicao")
     maquina_linha: Mapped["MaquinaLinha"] = relationship("MaquinaLinha", back_populates="medicoes")
+
+    @property
+    def linha_id(self) -> int | None:
+        return self.maquina_linha.linha_id if self.maquina_linha else None
