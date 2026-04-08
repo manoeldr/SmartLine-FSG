@@ -422,18 +422,30 @@ async function abrirModalMaquina(maquina) {
 
   // KPIs básicos do status
   document.getElementById('modal-maq-producao').textContent = maquina.producao !== null && maquina.producao !== undefined
-    ? maquina.producao.toLocaleString('pt-BR') : '—';
-  document.getElementById('modal-maq-eficiencia').textContent = maquina.eficiencia !== null ? `${maquina.eficiencia}%` : '—';
-  document.getElementById('modal-maq-tempo-parado').textContent = maquina.tempo_parado_ms ? formatTimeMM(maquina.tempo_parado_ms) : '—';
-  document.getElementById('modal-maq-mtbf').textContent = maquina.mtbf_ms ? formatTimeMM(maquina.mtbf_ms) : '—';
-  document.getElementById('modal-maq-mttr').textContent = maquina.mttr_ms ? formatTimeMM(maquina.mttr_ms) : '—';
-  document.getElementById('modal-maq-oee').textContent = '—';
+    ? maquina.producao.toLocaleString('pt-BR') : '0';
+  document.getElementById('modal-maq-eficiencia').textContent = maquina.eficiencia !== null ? `${maquina.eficiencia}%` : '0%';
+  document.getElementById('modal-maq-tempo-parado').textContent = maquina.tempo_parado_ms ? formatTimeMM(maquina.tempo_parado_ms) : '00:00';
+  document.getElementById('modal-maq-mtbf').textContent = maquina.mtbf_ms ? formatTimeMM(maquina.mtbf_ms) : '00:00';
+  document.getElementById('modal-maq-mttr').textContent = maquina.mttr_ms ? formatTimeMM(maquina.mttr_ms) : '00:00';
+  document.getElementById('modal-maq-oee').textContent = '0%';
 
-  // Limpa conteúdo anterior
+  // Limpa conteúdo anterior e define os estados vazios como padrão
+  if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
+  
   document.getElementById('modal-maq-eventos').innerHTML = '';
-  document.getElementById('modal-maq-no-eventos')?.classList.add('hidden');
-  document.getElementById('modal-maq-no-stops')?.classList.add('hidden');
-  document.getElementById('modal-donut-inner')?.classList.remove('hidden');
+  
+  const legendElement = document.getElementById('modal-maq-pie-legend');
+  if (legendElement) legendElement.innerHTML = '';
+  
+  const timeElement = document.getElementById('modal-donut-time');
+  if (timeElement) timeElement.textContent = '00:00';
+  
+  const pctElement = document.getElementById('modal-donut-pct');
+  if (pctElement) pctElement.textContent = '0 paradas';
+
+  document.getElementById('modal-maq-no-eventos')?.classList.remove('hidden');
+  document.getElementById('modal-maq-no-stops')?.classList.remove('hidden');
+  document.getElementById('modal-donut-inner')?.classList.add('hidden');
 
   // Fecha ao clicar no overlay
   modal.onclick = (e) => { if (e.target === modal) fecharModal(); };
@@ -444,6 +456,7 @@ async function abrirModalMaquina(maquina) {
   novoBtn.addEventListener('click', fecharModal);
 
   modal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
 
   // Busca medição da máquina para enriquecer com dados calculados
   try {
@@ -489,6 +502,7 @@ async function abrirModalMaquina(maquina) {
 // Fecha o modal de detalhes da máquina.
 function fecharModal() {
   document.getElementById('modal-maquina-detalhes')?.classList.add('hidden');
+  document.body.classList.remove('modal-open');
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
 }
 
