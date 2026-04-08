@@ -289,6 +289,7 @@ async function abrirModalIniciar() {
         <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}" style="justify-content:flex-start;">
           <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
           <span>${m.nome}</span>
+          ${!m.velocidade_nominal ? '<span style="margin-left:auto;font-size:0.65rem;color:var(--amber);font-weight:600;">⚠ sem velocidade</span>' : ''}
         </div>
       `).join('');
 
@@ -303,7 +304,7 @@ async function abrirModalIniciar() {
     list.innerHTML = '<p style="color:var(--red);font-size:0.875rem;text-align:center;">Erro ao carregar máquinas</p>';
   }
 
-  // Ao confirmar: busca detalhes da máquina, salva no store e inicia medição
+  // Ao confirmar: valida velocidade, busca detalhes, salva no store e inicia medição
   replaceWithClone('btn-confirmar-inicio', el => {
     el.addEventListener('click', async () => {
       const selected = list.querySelector('.alarm-item.selected');
@@ -326,27 +327,31 @@ async function abrirModalIniciar() {
       };
 
       // Busca detalhes da máquina: velocidade, multiplicador e alarmes específicos
+      let maquinaDetalhes = null;
       try {
         const linhaId = store.config.linhaId;
         const todasMaquinas = await api.listarMaquinas(linhaId);
-        const maquinaDetalhes = todasMaquinas.find(m => m.id === maquinaSelecionada.id);
+        maquinaDetalhes = todasMaquinas.find(m => m.id === maquinaSelecionada.id);
+      } catch { /* silencioso */ }
 
-        const multiplier = Number(maquinaDetalhes?.multiplicador_produto ?? store.config.productMultiplier ?? 1) || 1;
-        const rawSpeed = Number(maquinaDetalhes?.velocidade_nominal ?? store.config.speed) || 0;
+      const rawSpeed = Number(maquinaDetalhes?.velocidade_nominal ?? store.config.speed) || 0;
 
-        store.updateConfig({
-          machine: maquinaSelecionada.nome,
-          maquinaLinhaId: maquinaSelecionada.id,
-          speed: rawSpeed,
-          productMultiplier: multiplier,
-          alarms: maquinaDetalhes?.alarmes ? JSON.parse(maquinaDetalhes.alarmes) : store.config.alarms,
-        });
-      } catch {
-        store.updateConfig({
-          machine: maquinaSelecionada.nome,
-          maquinaLinhaId: maquinaSelecionada.id,
-        });
+      // Bloqueia início se velocidade nominal não estiver configurada
+      if (!rawSpeed || rawSpeed === 0) {
+        mostrarAvisoModal('Esta máquina não tem velocidade nominal configurada. Configure em Config antes de iniciar.');
+        vibrate([100, 50, 100]);
+        return;
       }
+
+      const multiplier = Number(maquinaDetalhes?.multiplicador_produto ?? store.config.productMultiplier ?? 1) || 1;
+
+      store.updateConfig({
+        machine: maquinaSelecionada.nome,
+        maquinaLinhaId: maquinaSelecionada.id,
+        speed: rawSpeed,
+        productMultiplier: multiplier,
+        alarms: maquinaDetalhes?.alarmes ? JSON.parse(maquinaDetalhes.alarmes) : store.config.alarms,
+      });
 
       modal.classList.add('hidden');
       input.value = '';
@@ -361,6 +366,20 @@ async function abrirModalIniciar() {
   replaceWithClone('btn-cancelar-inicio', el => {
     el.addEventListener('click', () => modal.classList.add('hidden'));
   });
+}
+
+// Exibe um aviso dentro do modal de início de medição.
+// Some automaticamente após 4 segundos.
+function mostrarAvisoModal(msg) {
+  const existing = document.getElementById('modal-aviso-velocidade');
+  if (existing) existing.remove();
+  const aviso = document.createElement('p');
+  aviso.id = 'modal-aviso-velocidade';
+  aviso.style.cssText = 'color:var(--red);font-size:0.8125rem;text-align:center;margin-top:8px;padding:8px 12px;background:var(--red-dim);border-radius:var(--radius-sm);';
+  aviso.textContent = msg;
+  const btn = document.getElementById('btn-confirmar-inicio');
+  if (btn) btn.parentNode.insertBefore(aviso, btn);
+  setTimeout(() => aviso.remove(), 4000);
 }
 
 // ============================================================
