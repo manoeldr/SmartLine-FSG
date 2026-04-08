@@ -1,46 +1,9 @@
+/* KPI values padrão da tela overview */
 .page-overview .kpi-value { color: var(--text); }
 .page-overview #ov-efficiency { color: var(--brand-light); }
 .page-overview #ov-oee { color: var(--brand-light); }
-.page-overview #ov-export-btn { margin-top: 8px; }
 
-.pie-chart-container {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.pie-chart-container canvas {
-  flex-shrink: 0;
-  width: 120px;
-  height: 120px;
-}
-.pie-legend {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.pie-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.75rem;
-}
-.pie-legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.pie-legend-text {
-  color: var(--text);
-  font-weight: 600;
-  min-width: 54px;
-}
-.pie-legend-value {
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-
+/* Mensagem de estado vazio pequena — usada dentro de seções */
 .empty-state-sm {
   text-align: center;
   padding: 16px;
@@ -49,9 +12,10 @@
 }
 
 /* ============================================================
-   FILTROS
+   FILTROS — painel colapsável no topo do overview
    ============================================================ */
 
+/* Botão de abrir/fechar o painel de filtros */
 #ov-filter-btn {
   background: none;
   border: 1px solid var(--border);
@@ -63,12 +27,14 @@
   align-items: center;
 }
 
+/* Estado ativo — filtros aplicados */
 #ov-filter-btn.active {
   border-color: var(--brand);
   color: var(--brand);
   background: rgba(25, 97, 192, 0.08);
 }
 
+/* Container do painel de filtros com animação de entrada */
 .filter-panel {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -84,9 +50,10 @@
 }
 
 /* ============================================================
-   FLUXO DA LINHA
+   FLUXO DA LINHA — sequência visual das máquinas
    ============================================================ */
 
+/* Header da seção de fluxo */
 .fluxo-header {
   display: flex;
   justify-content: space-between;
@@ -96,6 +63,7 @@
   gap: 8px;
 }
 
+/* Wrapper com scroll horizontal para linhas com muitas máquinas */
 .fluxo-linha-wrapper {
   background: var(--bg);
   border-radius: 12px;
@@ -103,6 +71,7 @@
   overflow-x: auto;
 }
 
+/* Container horizontal das máquinas e setas */
 .fluxo-linha {
   display: flex;
   align-items: center;
@@ -111,13 +80,16 @@
   min-width: max-content;
 }
 
+/* Coluna de cada máquina: caixa + nome + eficiência */
 .fluxo-maquina {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  cursor: pointer;
 }
 
+/* Caixa visual da máquina — cor da borda indica estado */
 .fluxo-maquina-box {
   width: 72px;
   height: 72px;
@@ -134,12 +106,18 @@
   position: relative;
   background: var(--bg-card);
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: transform 0.1s, box-shadow 0.1s;
 }
 
-.fluxo-maquina-box.rodando { border-color: var(--green); }
-.fluxo-maquina-box.parado { border-color: var(--red); }
+/* Feedback visual ao toque */
+.fluxo-maquina:active .fluxo-maquina-box { transform: scale(0.93); }
+
+/* Cores de borda por estado */
+.fluxo-maquina-box.rodando { border-color: var(--green); background: rgba(34,197,94,0.05); }
+.fluxo-maquina-box.parado { border-color: var(--red); background: rgba(239,68,68,0.05); }
 .fluxo-maquina-box.ultima_medicao { border-color: var(--brand); }
 
+/* Indicador de status no canto superior direito da caixa */
 .fluxo-maquina-dot {
   position: absolute;
   top: 6px;
@@ -154,6 +132,7 @@
 .fluxo-maquina-dot.parado { background: var(--red); }
 .fluxo-maquina-dot.ultima_medicao { background: var(--brand); }
 
+/* Nome da máquina abaixo da caixa — truncado se longo */
 .fluxo-maquina-nome {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -165,16 +144,15 @@
   white-space: nowrap;
 }
 
-.fluxo-maquina-eficiencia {
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
+/* Eficiência abaixo do nome — colorida por estado */
+.fluxo-maquina-eficiencia { font-size: 0.75rem; font-weight: 700; }
 .fluxo-maquina-eficiencia.rodando { color: var(--green); }
 .fluxo-maquina-eficiencia.parado { color: var(--red); }
-.fluxo-maquina-eficiencia.sem_medicao { color: var(--text-dim); }
+.fluxo-maquina-eficiencia.sem_medicao,
+.fluxo-maquina-eficiencia.sem_informacao { color: var(--text-dim); }
 .fluxo-maquina-eficiencia.ultima_medicao { color: var(--brand); }
 
+/* Seta de conexão entre máquinas — colorida pelo estado da máquina anterior */
 .fluxo-seta {
   font-size: 1.25rem;
   padding: 0 6px;
@@ -185,11 +163,11 @@
 
 .fluxo-seta.rodando { color: var(--green); }
 .fluxo-seta.parado { color: var(--red); }
-.fluxo-seta.sem_medicao { color: var(--border); }
+.fluxo-seta.sem_informacao { color: var(--border); }
 .fluxo-seta.ultima_medicao { color: var(--brand); }
 
 /* ============================================================
-   CARDS DETALHADOS DAS MÁQUINAS
+   CARDS DETALHADOS — legado, mantido para compatibilidade
    ============================================================ */
 
 .maquina-card {
@@ -207,12 +185,9 @@
   margin-bottom: 12px;
 }
 
-.maquina-card-nome {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-}
+.maquina-card-nome { font-size: 1rem; font-weight: 700; color: var(--text); }
 
+/* Badge de status colorido por estado */
 .maquina-card-status {
   font-size: 0.75rem;
   font-weight: 600;
@@ -220,47 +195,258 @@
   border-radius: 20px;
 }
 
-.maquina-card-status.rodando {
-  background: rgba(34,197,94,0.12);
-  color: var(--green);
+.maquina-card-status.rodando { background: rgba(34,197,94,0.12); color: var(--green); }
+.maquina-card-status.parado { background: rgba(239,68,68,0.12); color: var(--red); }
+.maquina-card-status.sem_informacao { background: var(--bg-card-alt); color: var(--text-dim); }
+.maquina-card-status.ultima_medicao { background: rgba(25,97,192,0.12); color: var(--brand); }
+
+/* Grid 2 colunas para métricas da máquina */
+.maquina-card-metricas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.maquina-metrica { display: flex; flex-direction: column; gap: 2px; }
+.maquina-metrica-label { font-size: 0.6875rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.3px; }
+.maquina-metrica-value { font-size: 0.9375rem; font-weight: 600; color: var(--text); }
+
+/* ============================================================
+   MODAL DETALHES DA MÁQUINA — bottom sheet deslizante
+   ============================================================ */
+
+/* Overlay escuro que cobre toda a tela — sem padding para o modal ocupar 100% da largura */
+#modal-maquina-detalhes {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 !important;
+  align-items: stretch !important;
 }
 
-.maquina-card-status.parado {
-  background: rgba(239,68,68,0.12);
-  color: var(--red);
+#modal-maquina-detalhes.hidden { display: none !important; }
+
+/* Container do modal — altura fixa de 92vh para ocupar a tela toda */
+.modal-maquina {
+  background: var(--bg-card);
+  border-radius: 20px 20px 0 0;
+  height: 92vh;
+  overflow-y: auto;
+  width: 100%;
+  animation: slideUp 0.25s ease;
 }
 
-.maquina-card-status.sem_informacao {
-  background: var(--bg-card-alt);
-  color: var(--text-dim);
+/* Animação de entrada do modal de baixo para cima */
+@keyframes slideUp {
+  from { transform: translateY(60px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
-.maquina-card-status.ultima_medicao {
-  background: rgba(25,97,192,0.12);
-  color: var(--brand);
+/* Indicador visual de arrasto no topo do modal */
+.modal-maquina-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 10px auto 0;
 }
 
-.maquina-card-metricas {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* Header fixo com nome da máquina, status e botão de fechar */
+.modal-maquina-header {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  z-index: 1;
+}
+
+/* Coluna com nome e subtítulo do header */
+.modal-maquina-titulo { display: flex; flex-direction: column; gap: 4px; }
+
+/* Nome da máquina com dot de status inline */
+.modal-maquina-nome {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.maquina-metrica {
+/* Subtítulo com estado da máquina */
+.modal-maquina-sub { font-size: 0.75rem; color: var(--text-dim); }
+
+/* Botão circular de fechar no canto direito do header */
+.modal-maquina-fechar {
+  background: var(--bg);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* Grid 3 colunas de KPIs — 2 linhas: Produção/Eficiência/OEE e Parado/MTBF/MTTR */
+.modal-maquina-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 16px;
+}
+
+/* Card individual de KPI */
+.modal-kpi {
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
-.maquina-metrica-label {
-  font-size: 0.6875rem;
-  color: var(--text-dim);
+.modal-kpi-label {
+  font-size: 0.625rem;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  font-weight: 600;
 }
 
-.maquina-metrica-value {
-  font-size: 0.9375rem;
+.modal-kpi-value { font-size: 1.0625rem; font-weight: 700; color: var(--text); }
+
+/* ============================================================
+   GRÁFICO DONUT DE PARADAS — com tempo total no centro
+   ============================================================ */
+
+.modal-donut-container { padding: 0 16px 16px; }
+.modal-donut-container h3 { margin-bottom: 12px; }
+
+/* Linha horizontal: donut à esquerda + legenda à direita */
+.modal-donut-inner { display: flex; align-items: center; gap: 16px; }
+
+/* Wrapper do canvas com overlay de texto central */
+.modal-donut-wrapper {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+}
+
+/* Texto sobreposto ao centro do donut (tempo total + contador) */
+.modal-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.modal-donut-center-time { font-size: 1rem; font-weight: 700; color: var(--text); }
+.modal-donut-center-pct { font-size: 0.6875rem; color: var(--text-dim); }
+
+/* Legenda ao lado do donut — um item por motivo */
+.modal-donut-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+
+.modal-donut-legend-item { display: flex; flex-direction: column; gap: 2px; }
+
+/* Linha com dot colorido + nome do motivo */
+.modal-donut-legend-row { display: flex; align-items: center; gap: 6px; }
+
+.modal-donut-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Nome do motivo — truncado se longo */
+.modal-donut-legend-nome {
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 110px;
 }
+
+/* Detalhe com tempo e percentual, indentado abaixo do nome */
+.modal-donut-legend-detalhe { font-size: 0.6875rem; color: var(--text-dim); padding-left: 14px; }
+
+/* ============================================================
+   TIMELINE DE EVENTOS RECENTES
+   ============================================================ */
+
+.modal-eventos { padding: 0 16px 32px; }
+.modal-eventos h3 { margin-bottom: 12px; }
+
+.evento-timeline { display: flex; flex-direction: column; gap: 0; }
+
+/* Item de evento com hora, ícone e descrição */
+.evento-item { display: flex; gap: 10px; position: relative; }
+
+/* Linha vertical conectando eventos consecutivos */
+.evento-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 46px;
+  top: 28px;
+  bottom: -4px;
+  width: 2px;
+  background: var(--border);
+}
+
+/* Horário do evento — alinhado à direita, largura fixa */
+.evento-hora {
+  font-size: 0.6875rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  padding-top: 7px;
+  text-align: right;
+}
+
+/* Círculo com ícone por tipo de evento */
+.evento-icone {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.evento-icone.parada { background: rgba(239,68,68,0.12); color: var(--red); }
+.evento-icone.marcha { background: rgba(34,197,94,0.12); color: var(--green); }
+.evento-icone.producao { background: rgba(59,130,246,0.12); color: #3b82f6; }
+.evento-icone.start { background: rgba(25,97,192,0.12); color: var(--brand); }
+
+/* Corpo do evento com tipo e motivo */
+.evento-body { padding: 4px 0 16px; }
+.evento-tipo { font-size: 0.8125rem; font-weight: 600; color: var(--text); }
+.evento-motivo { font-size: 0.75rem; color: var(--text-dim); margin-top: 1px; }
+
+/* ============================================================
+   DOT DE STATUS INLINE — usado no header do modal
+   ============================================================ */
+
+/* Bolinha colorida inline ao lado do nome da máquina */
+.status-dot-inline {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot-inline.rodando { background: var(--green); }
+.status-dot-inline.parado { background: var(--red); }
+.status-dot-inline.sem_informacao { background: var(--border); }
+.status-dot-inline.ultima_medicao { background: var(--brand); }

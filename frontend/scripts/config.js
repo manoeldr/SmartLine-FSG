@@ -263,8 +263,7 @@ function configurarBotaoAdicionarMaquina() {
 }
 
 // Renderiza a lista de máquinas com drag-and-drop para reordenação.
-// Cada item tem botão ⋮ para configurar e × para remover.
-// Máquinas marcadas como críticas exibem um indicador visual (★).
+// Máquinas críticas exibem ★. Cada item tem botão ⋮ para configurar e × para remover.
 function renderMaquinas() {
   const list = document.getElementById('cfg-maquinas-list');
   if (estadoConfig.maquinas.length === 0) {
@@ -278,7 +277,14 @@ function renderMaquinas() {
       <span class="maquina-ordem">${m.ordem}</span>
       <span class="maquina-nome">${m.nome}</span>
       ${m.critica ? '<span style="color:var(--brand);font-size:1rem;margin-right:4px;">★</span>' : ''}
-      <button type="button" class="btn-icon config-maquina" data-id="${m.id}" data-nome="${m.nome}" data-velocidade="${m.velocidade_nominal || ''}" data-multiplicador="${m.multiplicador_produto ?? 1}" data-critica="${m.critica ? 'true' : 'false'}" data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
+      <button type="button" class="btn-icon config-maquina"
+        data-id="${m.id}"
+        data-nome="${m.nome}"
+        data-velocidade="${m.velocidade_nominal || ''}"
+        data-sobrevelocidade="${m.sobrevelocidade || ''}"
+        data-multiplicador="${m.multiplicador_produto ?? 1}"
+        data-critica="${m.critica ? 'true' : 'false'}"
+        data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
       <button type="button" class="btn-icon remove-maquina" data-id="${m.id}">×</button>
     </div>
   `).join('');
@@ -289,10 +295,11 @@ function renderMaquinas() {
       const id = parseInt(btn.dataset.id);
       const nome = btn.dataset.nome;
       const velocidade = btn.dataset.velocidade;
+      const sobrevelocidade = btn.dataset.sobrevelocidade;
       const multiplicador = btn.dataset.multiplicador;
       const critica = btn.dataset.critica === 'true';
       const alarmes = JSON.parse(decodeURIComponent(btn.dataset.alarmes));
-      abrirModalConfigMaquina(id, nome, velocidade, multiplicador, critica, alarmes);
+      abrirModalConfigMaquina(id, nome, velocidade, sobrevelocidade, multiplicador, critica, alarmes);
     });
   });
 
@@ -380,9 +387,10 @@ function limparMaquinas() {
 // ============================================================
 
 // Abre o modal de configuração de uma máquina específica.
-// Permite editar: velocidade nominal, multiplicador de produto, crítica e alarmes.
-// Ao marcar como crítica, o backend desmarca automaticamente as demais da linha.
-function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1, critica = false, alarmes) {
+// Máquina crítica: exibe campo de velocidade nominal.
+// Demais máquinas: exibe campo de sobrevelocidade (%).
+// O toggle de crítica troca dinamicamente os campos exibidos.
+function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, multiplicador = 1, critica = false, alarmes) {
   document.getElementById('modal-config-maquina')?.remove();
 
   const modal = document.createElement('div');
@@ -393,15 +401,23 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
       <h3>${nome}</h3>
       <p class="modal-sub">Configuração específica desta máquina</p>
 
-      <div class="form-group">
+      <!-- Campo de velocidade nominal — visível apenas na máquina crítica -->
+      <div class="form-group" id="modal-maq-grupo-velocidade" style="${critica ? '' : 'display:none;'}">
         <label>Velocidade nominal (unidades/hora)</label>
         <input type="number" id="modal-maq-velocidade" class="input" placeholder="Ex: 12000" value="${velocidade}" inputmode="numeric">
+      </div>
+
+      <!-- Campo de sobrevelocidade — visível nas máquinas não críticas -->
+      <div class="form-group" id="modal-maq-grupo-sobrevelocidade" style="${critica ? 'display:none;' : ''}">
+        <label>Sobrevelocidade (% acima da nominal)</label>
+        <input type="number" step="0.1" min="0" id="modal-maq-sobrevelocidade" class="input" placeholder="Ex: 10 (significa 10% acima)" value="${sobrevelocidade}" inputmode="numeric">
+        <p class="modal-sub" style="margin-top:4px;">Permite suprir a produção caso a máquina crítica pare.</p>
       </div>
 
       <div class="form-group">
         <label>Multiplicador de produto</label>
         <input type="number" step="0.01" min="0.01" id="modal-maq-multiplicador" class="input" placeholder="Ex: 24 (garrafas por caixa)" value="${multiplicador}">
-        <p class="modal-sub" style="margin-top:4px;">Aplicado sobre velocidade nominal para cálculo de unidades finais.</p>
+        <p class="modal-sub" style="margin-top:4px;">Aplicado sobre a velocidade para cálculo de unidades finais.</p>
       </div>
 
       <div class="theme-toggle-row" style="margin-bottom:16px;">
@@ -436,15 +452,19 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
   `;
   document.body.appendChild(modal);
 
-  // Estado local do toggle crítica
+  // Estado local do toggle crítica — troca os campos exibidos ao alternar
   let criticaAtual = critica;
   const toggle = document.getElementById('modal-maq-critica-toggle');
   const label = document.getElementById('modal-maq-critica-label');
+  const grupoVelocidade = document.getElementById('modal-maq-grupo-velocidade');
+  const grupoSobrevelocidade = document.getElementById('modal-maq-grupo-sobrevelocidade');
 
   toggle.addEventListener('click', () => {
     criticaAtual = !criticaAtual;
     toggle.classList.toggle('active', criticaAtual);
     label.textContent = criticaAtual ? 'Sim' : 'Não';
+    grupoVelocidade.style.display = criticaAtual ? '' : 'none';
+    grupoSobrevelocidade.style.display = criticaAtual ? 'none' : '';
   });
 
   let alarmesList = [...alarmes];
@@ -485,13 +505,21 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
     input.value = '';
   });
 
-  // Salva todas as configurações da máquina no backend e atualiza o estado local.
+  // Salva todas as configurações no backend e atualiza o estado local.
+  // Envia velocidade_nominal se crítica, sobrevelocidade se não crítica.
   document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
-    const velocidadeVal = parseFloat(document.getElementById('modal-maq-velocidade').value) || null;
+    const velocidadeVal = criticaAtual
+      ? (parseFloat(document.getElementById('modal-maq-velocidade').value) || null)
+      : null;
+    const sobrevelocidadeVal = !criticaAtual
+      ? (parseFloat(document.getElementById('modal-maq-sobrevelocidade').value) || null)
+      : null;
     const multiplicadorVal = parseFloat(document.getElementById('modal-maq-multiplicador').value) || 1;
+
     try {
       await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, {
         velocidade_nominal: velocidadeVal,
+        sobrevelocidade: sobrevelocidadeVal,
         multiplicador_produto: multiplicadorVal,
         critica: criticaAtual,
         alarmes: JSON.stringify(alarmesList),
@@ -499,10 +527,10 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, multiplicador = 1,
       const m = estadoConfig.maquinas.find(m => m.id === maquinaId);
       if (m) {
         m.velocidade_nominal = velocidadeVal;
+        m.sobrevelocidade = sobrevelocidadeVal;
         m.multiplicador_produto = multiplicadorVal;
         m.critica = criticaAtual;
         m.alarmes = JSON.stringify(alarmesList);
-        // Se marcou como crítica, desmarca as demais localmente
         if (criticaAtual) {
           estadoConfig.maquinas.forEach(maq => {
             if (maq.id !== maquinaId) maq.critica = false;

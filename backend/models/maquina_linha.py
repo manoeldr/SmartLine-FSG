@@ -4,6 +4,10 @@ from sqlalchemy import String, Integer, Float, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.database import Base
 
+
+# Model da máquina vinculada a uma linha de produção.
+# Armazena configurações específicas de cada máquina: velocidade, sobrevelocidade,
+# alarmes, multiplicador de produto e se é a máquina crítica da linha.
 class MaquinaLinha(Base):
     __tablename__ = "maquinas_linha"
 
@@ -11,9 +15,21 @@ class MaquinaLinha(Base):
     nome: Mapped[str] = mapped_column(String(100))
     ordem: Mapped[int] = mapped_column(Integer)
     linha_id: Mapped[int] = mapped_column(Integer, ForeignKey("linhas.id"))
+
+    # Velocidade em produtos/hora — preenchida apenas na máquina crítica
     velocidade_nominal: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Sobrevelocidade em % acima da nominal — preenchida nas máquinas não críticas
+    # Garante que, se a crítica parar, as demais possam suprir sem criar gargalo
+    sobrevelocidade: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Multiplicador aplicado sobre a velocidade nominal para calcular unidades finais
     multiplicador_produto: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # JSON string com lista de alarmes/motivos de parada específicos desta máquina
     alarmes: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+
+    # Indica se esta é a máquina crítica da linha — só pode haver uma por linha
     critica: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     linha: Mapped["Linha"] = relationship("Linha", back_populates="maquinas")

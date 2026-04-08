@@ -23,14 +23,7 @@ const defaultData = () => ({
     shiftStart: '08:00',
     shiftEnd: '17:00',
     alarmCategories: ['Interna', 'Externa'],
-    alarms: [
-      { name: 'Falha no sensor', category: 'Interna' },
-      { name: 'Falta de material', category: 'Externa' },
-      { name: 'Ajuste mecânico', category: 'Interna' },
-      { name: 'Troca de formato', category: 'Interna' },
-      { name: 'Manutenção preventiva', category: 'Interna' },
-      { name: 'Falta de energia', category: 'Externa' },
-    ],
+    alarms: [],
     productionInterval: 30,
     theme: 'dark',
   },
@@ -123,7 +116,7 @@ export const store = {
     }
   },
 
-  // Verifica se o app está configurado com cliente, linha e velocidade.
+  // Verifica se o app está configurado com cliente e linha.
   isConfigured() {
     const c = this._data.config;
     return c.client && c.linhaId;
@@ -190,7 +183,7 @@ export const store = {
           eventsLocal.push({ type: 'marcha', time: ev.timestamp });
           ultimoEstado = 'running';
         } else if (ev.tipo === 'parada') {
-          eventsLocal.push({ type: 'stop', time: ev.timestamp, reason: ev.motivo || null, category: null });
+          eventsLocal.push({ type: 'stop', time: ev.timestamp, reason: ev.motivo || null, category: null, backendId: ev.id || null });
           ultimoEstado = 'stopped';
         } else if (ev.tipo === 'producao' && ev.producao_leitura !== null) {
           eventsLocal.push({ type: 'production', time: ev.timestamp, value: ev.producao_leitura });
@@ -278,6 +271,7 @@ export const store = {
   },
 
   // Atualiza o motivo e categoria da última parada registrada.
+  // Se o evento tiver backendId, envia o motivo ao backend também.
   setStopReason(reason, category = null) {
     const m = this._data.measurement;
     const lastStop = [...m.events].reverse().find(e => e.type === 'stop');
@@ -285,6 +279,9 @@ export const store = {
       lastStop.reason = reason;
       lastStop.category = category || this.getAlarmCategory(reason);
       this.save();
+      if (m.medicaoId && lastStop.backendId) {
+        api.atualizarMotivoEvento(m.medicaoId, lastStop.backendId, reason).catch(() => {});
+      }
     }
   },
 
@@ -295,13 +292,22 @@ export const store = {
   },
 
   // Registra evento de parada no estado local e envia ao backend imediatamente.
+  // Salva o backendId retornado para permitir atualizar o motivo depois.
   setParada() {
     const m = this._data.measurement;
     m.state = 'stopped';
-    m.events.push({ type: 'stop', time: new Date().toISOString(), reason: null, category: null });
+    const evento = { type: 'stop', time: new Date().toISOString(), reason: null, category: null, backendId: null };
+    m.events.push(evento);
     m.lastSyncedEventIndex = m.events.length;
     this.save();
-    if (m.medicaoId) api.registrarEvento(m.medicaoId, 'parada').catch(() => {});
+    if (m.medicaoId) {
+      api.registrarEvento(m.medicaoId, 'parada').then(resultado => {
+        if (resultado?.id) {
+          evento.backendId = resultado.id;
+          this.save();
+        }
+      }).catch(() => {});
+    }
   },
 
   // ============================================================

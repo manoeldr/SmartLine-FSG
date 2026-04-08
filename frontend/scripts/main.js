@@ -7,9 +7,7 @@
 
 import { initOverview, updateOverview } from './overview.js';
 import { initMedicao, updateMedicao, cleanupMedicao } from './medicao.js';
-import { initParadas } from './paradas.js';
 import { initConfig } from './config.js';
-import { initDashboard, updateDashboard } from './dashboard.js';
 import { store } from './store.js';
 import { vibrate } from './utils.js';
 
@@ -43,11 +41,9 @@ async function loadPage(name) {
     container.innerHTML = html;
 
     switch (name) {
-      case 'overview':  initOverview();  break;
-      case 'medicao':   initMedicao();   break;
-      case 'paradas':   initParadas();   break;
-      case 'config':    initConfig();    break;
-      case 'dashboard': initDashboard(); break;
+      case 'overview': initOverview(); break;
+      case 'medicao':  initMedicao();  break;
+      case 'config':   initConfig();   break;
     }
   } catch (e) {
     if (currentPage !== name) return;
@@ -147,9 +143,8 @@ function initGlobalModals() {
 // Tick global: roda a cada 1 segundo para atualizar timers,
 // verificar fim de turno e solicitar leituras de produção.
 setInterval(() => {
-  if (currentPage === 'overview')  updateOverview();
-  if (currentPage === 'medicao')   updateMedicao();
-  if (currentPage === 'dashboard') updateDashboard();
+  if (currentPage === 'overview') updateOverview();
+  if (currentPage === 'medicao')  updateMedicao();
 
   if (store.measurement.active) {
     if (store.shouldPromptProduction()) {
@@ -171,8 +166,8 @@ setInterval(() => {
   }
 }, 1000);
 
-// Inicialização do app.
+// Inicialização do app — abre direto na tela de Medição.
 store.init();
 store.applyTheme();
 initGlobalModals();
-loadPage('overview');
+loadPage('medicao');

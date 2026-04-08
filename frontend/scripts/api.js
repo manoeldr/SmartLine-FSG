@@ -97,13 +97,20 @@ export const api = {
     return request('POST', '/medicoes/', dados);
   },
 
-  // Registra um evento na medição ativa (marcha ou parada), com motivo e leitura de produção opcionais.
+  // Registra um evento na medição ativa (marcha, parada ou produção),
+  // com motivo e leitura de produção opcionais.
   async registrarEvento(medicaoId, tipo, motivo = null, producaoLeitura = null) {
     return request('POST', `/medicoes/${medicaoId}/eventos/`, {
       tipo,
       motivo,
       producao_leitura: producaoLeitura,
     });
+  },
+
+  // Atualiza o motivo de um evento de parada específico.
+  // Chamado após o auditor confirmar o motivo no modal de parada.
+  async atualizarMotivoEvento(medicaoId, eventoId, motivo) {
+    return request('PATCH', `/medicoes/${medicaoId}/eventos/${eventoId}/motivo?motivo=${encodeURIComponent(motivo)}`);
   },
 
   // Finaliza uma medição informando a produção final. Define o timestamp_fim no backend.
@@ -130,12 +137,13 @@ export const api = {
     return request('GET', `/medicoes/?${params.toString()}`);
   },
 
-  // Busca uma medição específica pelo ID.
+  // Busca uma medição específica pelo ID, incluindo todos os eventos.
   async getMedicao(id) {
     return request('GET', `/medicoes/${id}`);
   },
 
   // Retorna a medição ativa de uma máquina e seus eventos.
+  // Usado para recuperar o estado após reinicialização do dispositivo.
   async medicaoAtiva(maquinaLinhaId) {
     return request('GET', `/medicoes/ativa?maquina_linha_id=${maquinaLinhaId}`);
   },
@@ -147,5 +155,4 @@ export const api = {
   async filtrosDisponiveis(linhaId) {
     return request('GET', `/medicoes/filtros-disponiveis?linha_id=${linhaId}`);
   },
-
 };
