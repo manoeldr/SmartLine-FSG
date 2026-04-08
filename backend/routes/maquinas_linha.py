@@ -69,6 +69,8 @@ def atualizar_maquina(linha_id: int, maquina_id: int, dados: MaquinaLinhaUpdate,
         maquina.ordem = dados.ordem
     if dados.velocidade_nominal is not None:
         maquina.velocidade_nominal = dados.velocidade_nominal
+    if dados.sobrevelocidade is not None:
+        maquina.sobrevelocidade = dados.sobrevelocidade
     if dados.alarmes is not None:
         maquina.alarmes = dados.alarmes
     if hasattr(dados, 'multiplicador_produto') and dados.multiplicador_produto is not None:

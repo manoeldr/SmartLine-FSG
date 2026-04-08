@@ -264,6 +264,7 @@ function configurarBotaoAdicionarMaquina() {
 
 // Renderiza a lista de máquinas com drag-and-drop para reordenação.
 // Máquinas críticas exibem ★. Cada item tem botão ⋮ para configurar e × para remover.
+// Exibe indicador visual se velocidade nominal não estiver configurada.
 function renderMaquinas() {
   const list = document.getElementById('cfg-maquinas-list');
   if (estadoConfig.maquinas.length === 0) {
@@ -271,23 +272,27 @@ function renderMaquinas() {
     return;
   }
 
-  list.innerHTML = estadoConfig.maquinas.map((m) => `
-    <div class="maquina-item" draggable="true" data-id="${m.id}">
-      <span class="drag-handle">⠿</span>
-      <span class="maquina-ordem">${m.ordem}</span>
-      <span class="maquina-nome">${m.nome}</span>
-      ${m.critica ? '<span style="color:var(--brand);font-size:1rem;margin-right:4px;">★</span>' : ''}
-      <button type="button" class="btn-icon config-maquina"
-        data-id="${m.id}"
-        data-nome="${m.nome}"
-        data-velocidade="${m.velocidade_nominal || ''}"
-        data-sobrevelocidade="${m.sobrevelocidade || ''}"
-        data-multiplicador="${m.multiplicador_produto ?? 1}"
-        data-critica="${m.critica ? 'true' : 'false'}"
-        data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
-      <button type="button" class="btn-icon remove-maquina" data-id="${m.id}">×</button>
-    </div>
-  `).join('');
+  list.innerHTML = estadoConfig.maquinas.map((m) => {
+    const semVelocidade = !m.velocidade_nominal;
+    return `
+      <div class="maquina-item" draggable="true" data-id="${m.id}">
+        <span class="drag-handle">⠿</span>
+        <span class="maquina-ordem">${m.ordem}</span>
+        <span class="maquina-nome">${m.nome}</span>
+        ${m.critica ? '<span style="color:var(--brand);font-size:1rem;margin-right:4px;">★</span>' : ''}
+        ${semVelocidade ? '<span style="color:var(--red);font-size:0.65rem;margin-right:4px;">⚠ vel.</span>' : ''}
+        <button type="button" class="btn-icon config-maquina"
+          data-id="${m.id}"
+          data-nome="${m.nome}"
+          data-velocidade="${m.velocidade_nominal || ''}"
+          data-sobrevelocidade="${m.sobrevelocidade || ''}"
+          data-multiplicador="${m.multiplicador_produto ?? 1}"
+          data-critica="${m.critica ? 'true' : 'false'}"
+          data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
+        <button type="button" class="btn-icon remove-maquina" data-id="${m.id}">×</button>
+      </div>
+    `;
+  }).join('');
 
   list.querySelectorAll('.config-maquina').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -387,9 +392,9 @@ function limparMaquinas() {
 // ============================================================
 
 // Abre o modal de configuração de uma máquina específica.
-// Máquina crítica: exibe campo de velocidade nominal.
-// Demais máquinas: exibe campo de sobrevelocidade (%).
-// O toggle de crítica troca dinamicamente os campos exibidos.
+// Todos os campos são exibidos independente de ser crítica ou não.
+// Velocidade nominal e sobrevelocidade são obrigatórios para cálculos corretos.
+// O toggle de crítica apenas define qual máquina é a referência da linha.
 function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, multiplicador = 1, critica = false, alarmes) {
   document.getElementById('modal-config-maquina')?.remove();
 
@@ -401,17 +406,18 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
       <h3>${nome}</h3>
       <p class="modal-sub">Configuração específica desta máquina</p>
 
-      <!-- Campo de velocidade nominal — visível apenas na máquina crítica -->
-      <div class="form-group" id="modal-maq-grupo-velocidade" style="${critica ? '' : 'display:none;'}">
-        <label>Velocidade nominal (unidades/hora)</label>
+      <!-- Velocidade nominal — obrigatória para todas as máquinas -->
+      <div class="form-group">
+        <label>Velocidade nominal (unidades/hora) <span style="color:var(--red)">*</span></label>
         <input type="number" id="modal-maq-velocidade" class="input" placeholder="Ex: 12000" value="${velocidade}" inputmode="numeric">
+        <p class="modal-sub" style="margin-top:4px;">Velocidade de operação padrão da máquina.</p>
       </div>
 
-      <!-- Campo de sobrevelocidade — visível nas máquinas não críticas -->
-      <div class="form-group" id="modal-maq-grupo-sobrevelocidade" style="${critica ? 'display:none;' : ''}">
-        <label>Sobrevelocidade (% acima da nominal)</label>
+      <!-- Sobrevelocidade — obrigatória para todas as máquinas -->
+      <div class="form-group">
+        <label>Sobrevelocidade (% acima da nominal) <span style="color:var(--red)">*</span></label>
         <input type="number" step="0.1" min="0" id="modal-maq-sobrevelocidade" class="input" placeholder="Ex: 10 (significa 10% acima)" value="${sobrevelocidade}" inputmode="numeric">
-        <p class="modal-sub" style="margin-top:4px;">Permite suprir a produção caso a máquina crítica pare.</p>
+        <p class="modal-sub" style="margin-top:4px;">Velocidade máxima para compensar paradas na linha.</p>
       </div>
 
       <div class="form-group">
@@ -420,6 +426,7 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
         <p class="modal-sub" style="margin-top:4px;">Aplicado sobre a velocidade para cálculo de unidades finais.</p>
       </div>
 
+      <!-- Toggle crítica — define qual máquina é a referência da linha -->
       <div class="theme-toggle-row" style="margin-bottom:16px;">
         <div class="theme-toggle-info">
           <span class="theme-toggle-label">Máquina crítica</span>
@@ -452,19 +459,15 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
   `;
   document.body.appendChild(modal);
 
-  // Estado local do toggle crítica — troca os campos exibidos ao alternar
+  // Toggle crítica — apenas muda o label, não esconde campos
   let criticaAtual = critica;
   const toggle = document.getElementById('modal-maq-critica-toggle');
   const label = document.getElementById('modal-maq-critica-label');
-  const grupoVelocidade = document.getElementById('modal-maq-grupo-velocidade');
-  const grupoSobrevelocidade = document.getElementById('modal-maq-grupo-sobrevelocidade');
 
   toggle.addEventListener('click', () => {
     criticaAtual = !criticaAtual;
     toggle.classList.toggle('active', criticaAtual);
     label.textContent = criticaAtual ? 'Sim' : 'Não';
-    grupoVelocidade.style.display = criticaAtual ? '' : 'none';
-    grupoSobrevelocidade.style.display = criticaAtual ? 'none' : '';
   });
 
   let alarmesList = [...alarmes];
@@ -505,16 +508,22 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
     input.value = '';
   });
 
-  // Salva todas as configurações no backend e atualiza o estado local.
-  // Envia velocidade_nominal se crítica, sobrevelocidade se não crítica.
+  // Salva todas as configurações no backend.
+  // Valida velocidade nominal obrigatória antes de salvar.
   document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
-    const velocidadeVal = criticaAtual
-      ? (parseFloat(document.getElementById('modal-maq-velocidade').value) || null)
-      : null;
-    const sobrevelocidadeVal = !criticaAtual
-      ? (parseFloat(document.getElementById('modal-maq-sobrevelocidade').value) || null)
-      : null;
+    const velocidadeRaw = document.getElementById('modal-maq-velocidade').value.trim();
+    const velocidadeVal = velocidadeRaw !== '' ? parseFloat(velocidadeRaw) : null;
+    const sobrevelocidadeRaw = document.getElementById('modal-maq-sobrevelocidade').value.trim();
+    const sobrevelocidadeVal = sobrevelocidadeRaw !== '' ? parseFloat(sobrevelocidadeRaw) : null;
     const multiplicadorVal = parseFloat(document.getElementById('modal-maq-multiplicador').value) || 1;
+
+    if (!velocidadeVal) {
+      document.getElementById('modal-maq-velocidade').style.borderColor = 'var(--red)';
+      showToast('Informe a velocidade nominal', 'erro');
+      return;
+    }
+
+    document.getElementById('modal-maq-velocidade').style.borderColor = '';
 
     try {
       await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, {
