@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIG.JS — Tela de configuração
 // Seções: Cliente, Linha, Fluxo da linha,
-// Configuração da medição (turno, velocidade, alarmes)
+// Configuração da medição (turno, intervalo de produção)
 // ============================================================
 
 import { store } from './store.js';
@@ -26,8 +26,6 @@ export function initConfig() {
     configurarBotaoAdicionarMaquina();
     configurarBotaoSalvar();
     configurarBotaoReset();
-    configurarTema();
-    configurarAlarmes();
     preencherConfigMedicao();
     carregarClientes();
   }, 50);
@@ -393,8 +391,7 @@ function limparMaquinas() {
 
 // Abre o modal de configuração de uma máquina específica.
 // Todos os campos são exibidos independente de ser crítica ou não.
-// Velocidade nominal e sobrevelocidade são obrigatórios para cálculos corretos.
-// O toggle de crítica apenas define qual máquina é a referência da linha.
+// Velocidade nominal obrigatória. Toggle crítica define a máquina referência da linha.
 function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, multiplicador = 1, critica = false, alarmes) {
   document.getElementById('modal-config-maquina')?.remove();
 
@@ -406,16 +403,14 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
       <h3>${nome}</h3>
       <p class="modal-sub">Configuração específica desta máquina</p>
 
-      <!-- Velocidade nominal — obrigatória para todas as máquinas -->
       <div class="form-group">
         <label>Velocidade nominal (unidades/hora) <span style="color:var(--red)">*</span></label>
         <input type="number" id="modal-maq-velocidade" class="input" placeholder="Ex: 12000" value="${velocidade}" inputmode="numeric">
         <p class="modal-sub" style="margin-top:4px;">Velocidade de operação padrão da máquina.</p>
       </div>
 
-      <!-- Sobrevelocidade — obrigatória para todas as máquinas -->
       <div class="form-group">
-        <label>Sobrevelocidade (% acima da nominal) <span style="color:var(--red)">*</span></label>
+        <label>Sobrevelocidade (% acima da nominal)</label>
         <input type="number" step="0.1" min="0" id="modal-maq-sobrevelocidade" class="input" placeholder="Ex: 10 (significa 10% acima)" value="${sobrevelocidade}" inputmode="numeric">
         <p class="modal-sub" style="margin-top:4px;">Velocidade máxima para compensar paradas na linha.</p>
       </div>
@@ -426,7 +421,6 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
         <p class="modal-sub" style="margin-top:4px;">Aplicado sobre a velocidade para cálculo de unidades finais.</p>
       </div>
 
-      <!-- Toggle crítica — define qual máquina é a referência da linha -->
       <div class="theme-toggle-row" style="margin-bottom:16px;">
         <div class="theme-toggle-info">
           <span class="theme-toggle-label">Máquina crítica</span>
@@ -459,7 +453,7 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
   `;
   document.body.appendChild(modal);
 
-  // Toggle crítica — apenas muda o label, não esconde campos
+  // Toggle crítica — apenas muda o label
   let criticaAtual = critica;
   const toggle = document.getElementById('modal-maq-critica-toggle');
   const label = document.getElementById('modal-maq-critica-label');
@@ -508,8 +502,7 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
     input.value = '';
   });
 
-  // Salva todas as configurações no backend.
-  // Valida velocidade nominal obrigatória antes de salvar.
+  // Salva todas as configurações no backend. Valida velocidade nominal obrigatória.
   document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
     const velocidadeRaw = document.getElementById('modal-maq-velocidade').value.trim();
     const velocidadeVal = velocidadeRaw !== '' ? parseFloat(velocidadeRaw) : null;
@@ -564,8 +557,6 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
 // Preenche os campos da seção de medição com os valores salvos no store.
 function preencherConfigMedicao() {
   const cfg = store.config;
-  const speedEl = document.getElementById('cfg-speed');
-  if (speedEl) speedEl.value = cfg.speed || '';
   document.getElementById('cfg-shift-start').value = cfg.shiftStart || '08:00';
   document.getElementById('cfg-shift-end').value = cfg.shiftEnd || '17:00';
   document.getElementById('cfg-prod-interval').value = cfg.productionInterval || 30;
@@ -576,12 +567,10 @@ function configurarBotaoSalvar() {
   const btn = document.getElementById('cfg-save-btn');
   if (!btn) return;
   btn.addEventListener('click', () => {
-    const speedEl = document.getElementById('cfg-speed');
     store.updateConfig({
       clienteId: estadoConfig.clienteId,
       linhaId: estadoConfig.linhaId,
       client: document.getElementById('cfg-cliente-select')?.selectedOptions[0]?.text || store.config.client || '',
-      speed: speedEl ? parseInt(speedEl.value) || 0 : store.config.speed,
       shiftStart: document.getElementById('cfg-shift-start').value,
       shiftEnd: document.getElementById('cfg-shift-end').value,
       productionInterval: parseInt(document.getElementById('cfg-prod-interval').value) || 30,
@@ -599,97 +588,6 @@ function configurarBotaoReset() {
       store.resetMeasurement();
       showToast('Medição resetada');
     }
-  });
-}
-
-// ============================================================
-// TEMA
-// ============================================================
-
-// Configura o toggle de tema claro/escuro. Persiste a preferência via store.
-function configurarTema() {
-  const themeToggle = document.getElementById('cfg-theme-toggle');
-  const themeLabel = document.getElementById('cfg-theme-label');
-  const currentTheme = store.getTheme();
-
-  if (currentTheme === 'light') {
-    themeToggle.classList.add('active');
-    themeLabel.textContent = 'Claro';
-  } else {
-    themeToggle.classList.remove('active');
-    themeLabel.textContent = 'Escuro';
-  }
-
-  themeToggle.addEventListener('click', () => {
-    const isLight = themeToggle.classList.contains('active');
-    const newTheme = isLight ? 'dark' : 'light';
-    store.setTheme(newTheme);
-    themeToggle.classList.toggle('active');
-    themeLabel.textContent = newTheme === 'light' ? 'Claro' : 'Escuro';
-  });
-}
-
-// ============================================================
-// ALARMES (globais — mantidos para compatibilidade)
-// ============================================================
-
-// Inicializa a seção de alarmes globais. Renderiza a lista existente e configura
-// os botões de adicionar e remover. Retorna silenciosamente se a seção estiver oculta.
-function configurarAlarmes() {
-  const catSelect = document.getElementById('cfg-new-alarm-cat');
-  if (!catSelect) return;
-
-  catSelect.innerHTML = (store.config.alarmCategories || ['Interna', 'Externa']).map(c =>
-    `<option value="${c}">${c}</option>`
-  ).join('');
-
-  renderAlarms();
-
-  document.getElementById('cfg-add-alarm')?.addEventListener('click', () => {
-    const nameInput = document.getElementById('cfg-new-alarm');
-    const catSelect = document.getElementById('cfg-new-alarm-cat');
-    if (nameInput.value.trim()) {
-      store.addAlarm(nameInput.value.trim(), catSelect.value);
-      nameInput.value = '';
-      renderAlarms();
-    }
-  });
-
-  document.getElementById('cfg-new-alarm')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('cfg-add-alarm').click(); }
-  });
-}
-
-// Renderiza a lista de alarmes globais agrupados por categoria.
-function renderAlarms() {
-  const list = document.getElementById('cfg-alarm-list');
-  if (!list) return;
-  const alarms = store.config.alarms;
-  const grouped = {};
-  alarms.forEach((a, i) => {
-    const cat = a.category || 'Interna';
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push({ ...a, originalIndex: i });
-  });
-
-  let html = '';
-  for (const [cat, items] of Object.entries(grouped)) {
-    html += `<div class="alarm-category-label">${cat}</div>`;
-    for (const item of items) {
-      html += `<div class="alarm-item">
-        <span>${item.name}</span>
-        <button type="button" class="remove-alarm" data-index="${item.originalIndex}">×</button>
-      </div>`;
-    }
-  }
-  list.innerHTML = html;
-
-  list.querySelectorAll('.remove-alarm').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      store.removeAlarm(parseInt(btn.dataset.index));
-      renderAlarms();
-    });
   });
 }
 
