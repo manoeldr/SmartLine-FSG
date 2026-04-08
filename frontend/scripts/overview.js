@@ -429,20 +429,15 @@ async function abrirModalMaquina(maquina) {
   document.getElementById('modal-maq-mttr').textContent = maquina.mttr_ms ? formatTimeMM(maquina.mttr_ms) : '00:00';
   document.getElementById('modal-maq-oee').textContent = '0%';
 
-  // Limpa conteúdo anterior e define os estados vazios como padrão
+  // Limpa conteúdo anterior
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
-  
   document.getElementById('modal-maq-eventos').innerHTML = '';
-  
   const legendElement = document.getElementById('modal-maq-pie-legend');
   if (legendElement) legendElement.innerHTML = '';
-  
   const timeElement = document.getElementById('modal-donut-time');
   if (timeElement) timeElement.textContent = '00:00';
-  
   const pctElement = document.getElementById('modal-donut-pct');
   if (pctElement) pctElement.textContent = '0 paradas';
-
   document.getElementById('modal-maq-no-eventos')?.classList.remove('hidden');
   document.getElementById('modal-maq-no-stops')?.classList.remove('hidden');
   document.getElementById('modal-donut-inner')?.classList.add('hidden');
@@ -544,7 +539,6 @@ function renderModalDonut(eventos, endTime, totalStoppedMs) {
 
   const total = entries.reduce((s, [, v]) => s + v.totalMs, 0);
 
-  // Texto no centro do donut — tempo total parado
   document.getElementById('modal-donut-time').textContent = formatTimeMM(totalStoppedMs);
   document.getElementById('modal-donut-pct').textContent = `${entries.reduce((s, [, v]) => s + v.count, 0)} paradas`;
 
@@ -578,7 +572,6 @@ function renderModalDonut(eventos, endTime, totalStoppedMs) {
     }
   });
 
-  // Legenda com nome + tempo · percentual
   legend.innerHTML = entries.map(([motivo, data], i) => {
     const pct = Math.round((data.totalMs / total) * 100);
     const mins = Math.floor(data.totalMs / 60000);
@@ -597,7 +590,7 @@ function renderModalDonut(eventos, endTime, totalStoppedMs) {
 }
 
 // Renderiza a timeline de eventos recentes no modal.
-// Mostra horário, ícone por tipo e motivo quando disponível.
+// Mostra horário, ícone, motivo e duração de cada evento à direita.
 function renderModalEventos(eventos, startTime) {
   const container = document.getElementById('modal-maq-eventos');
   const noEventos = document.getElementById('modal-maq-no-eventos');
@@ -617,6 +610,13 @@ function renderModalEventos(eventos, startTime) {
 
   noEventos?.classList.add('hidden');
 
+  // Lista completa em ordem cronológica para calcular durações
+  const todosCronologicos = [...eventos]
+    .filter(e => ['parada', 'marcha', 'producao'].includes(e.tipo))
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+  const agora = new Date();
+
   const iconePorTipo = {
     parada: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`,
     marcha: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
@@ -629,10 +629,25 @@ function renderModalEventos(eventos, startTime) {
     const hora = new Date(ev.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const icone = iconePorTipo[ev.tipo] || '';
     const label = labelPorTipo[ev.tipo] || ev.tipo;
+
     let motivo = '';
     if (ev.tipo === 'parada') motivo = ev.motivo || 'Sem informação';
     if (ev.tipo === 'marcha') motivo = 'Retomada';
     if (ev.tipo === 'producao') motivo = `${ev.producao_leitura?.toLocaleString('pt-BR') || '—'} un`;
+
+    // Calcula duração — tempo até o próximo evento (ou agora se for o último)
+    let duracao = '';
+    const idxCron = todosCronologicos.findIndex(e => e.timestamp === ev.timestamp && e.tipo === ev.tipo);
+    if (idxCron !== -1) {
+      const proximo = todosCronologicos[idxCron + 1];
+      const fim = proximo ? new Date(proximo.timestamp) : agora;
+      const durationMs = fim - new Date(ev.timestamp);
+      if (durationMs > 0) {
+        const mins = Math.floor(durationMs / 60000);
+        const secs = Math.floor((durationMs % 60000) / 1000);
+        duracao = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      }
+    }
 
     return `
       <div class="evento-item">
@@ -642,6 +657,7 @@ function renderModalEventos(eventos, startTime) {
           <div class="evento-tipo">${label}</div>
           ${motivo ? `<div class="evento-motivo">${motivo}</div>` : ''}
         </div>
+        ${duracao && ev.tipo !== 'producao' ? `<span class="evento-duracao">${duracao}</span>` : ''}
       </div>
     `;
   }).join('');

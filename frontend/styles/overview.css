@@ -450,6 +450,18 @@
 .evento-tipo { font-size: 0.8125rem; font-weight: 600; color: var(--text); }
 .evento-motivo { font-size: 0.75rem; color: var(--text-dim); margin-top: 1px; }
 
+/* Duração do evento — exibida à direita da timeline */
+.evento-duracao {
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-left: auto;
+  padding-top: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 /* ============================================================
    DOT DE STATUS INLINE
    ============================================================ */
