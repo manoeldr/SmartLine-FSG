@@ -1,18 +1,39 @@
+/* ============================================================
+   NAVBAR — barra flutuante estilo pill, inspirada no Safari iOS
+   Não ocupa toda a largura — flutua centralizada sobre o conteúdo
+   ============================================================ */
+
+/* Container — pill centralizado na base com margem dos lados */
 #navbar {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: var(--nav-height);
-  background: var(--brand);
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 240px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 32px;
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding: 0 12px;
+  gap: 4px;
   z-index: 100;
-  box-shadow: var(--shadow);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
+/* Navbar no tema escuro */
+[data-theme="dark"] #navbar {
+  background: rgba(22, 22, 30, 0.88);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Botão de navegação padrão — ícone + label empilhados */
 .nav-btn {
   display: flex;
   flex-direction: column;
@@ -20,32 +41,40 @@
   gap: 3px;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-dim);
   font-size: 0.625rem;
   font-weight: 500;
   cursor: pointer;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  transition: all 0.2s;
-  letter-spacing: 0.3px;
+  padding: 8px 16px;
+  border-radius: 24px;
+  transition: color 0.15s, background 0.15s, transform 0.1s;
+  letter-spacing: 0.2px;
   -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
 }
 
+/* Estado ativo — cor da marca */
 .nav-btn.active {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.12);
+  color: var(--brand);
+  background: rgba(25, 97, 192, 0.08);
 }
 
+/* Feedback de toque */
 .nav-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.90);
 }
 
+/* Ícones SVG */
 .nav-btn svg {
   width: 22px;
   height: 22px;
 }
 
-/* Botão central — Dashboard da linha (símbolo SanMartin) */
+/* ============================================================
+   BOTÃO CENTRAL — símbolo SanMartin em círculo branco elevado
+   ============================================================ */
+
+/* Círculo branco com sombra azulada sutil */
 .nav-btn-center {
   width: 44px;
   height: 44px;
@@ -53,24 +82,28 @@
   background: #fff;
   color: var(--brand);
   padding: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(25, 97, 192, 0.2);
   flex-shrink: 0;
-  border: none;
+  border: 1px solid rgba(25, 97, 192, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.1s, box-shadow 0.15s;
 }
 
-.nav-btn-center svg {
-  width: 35px;
-  height: 35px;
+/* Ícone SVG dentro do botão central */
+.nav-btn-center img {
+  width: 26px;
+  height: 26px;
 }
 
+/* Estado ativo — sombra mais pronunciada */
 .nav-btn-center.active {
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--brand-dark);
+  box-shadow: 0 4px 16px rgba(25, 97, 192, 0.3);
+  border-color: rgba(25, 97, 192, 0.2);
 }
 
+/* Feedback de toque */
 .nav-btn-center:active {
-  transform: scale(0.9);
+  transform: scale(0.90);
 }
