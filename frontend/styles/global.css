@@ -1,0 +1,35 @@
+/* ============================================================
+   GLOBAL.CSS — Elementos globais do app
+   Componentes que persistem em todas as telas (fora do page-container)
+   ============================================================ */
+
+/* ── Botão de alternância de tema ───────────────────────── */
+
+/* Fixado no canto superior direito, sobre todas as páginas */
+#btn-theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 16px;
+  z-index: 150;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  box-shadow: var(--shadow);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#btn-theme-toggle:active { transform: scale(0.90); }
+
+/* Ícone de sol — visível no tema escuro */
+#icon-sun { display: none; color: var(--amber); }
+
+/* Ícone de lua — visível no tema claro */
+#icon-moon { display: block; color: var(--text-muted); }

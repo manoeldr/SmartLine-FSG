@@ -1,35 +1,90 @@
+/* ============================================================
+   CONFIG.CSS — Tela de configuração
+   Seções de cliente, linha, máquinas e configuração da medição
+   ============================================================ */
+
+/* Espaçamento entre seções */
 .page-config .section-card { margin-bottom: 16px; }
 .page-config .btn-primary { margin-bottom: 16px; }
 
-.theme-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+/* ── Toggle de tema claro/escuro ────────────────────────── */
+
+/* Linha com label à esquerda e toggle à direita */
+.theme-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Coluna com nome e valor atual do tema */
 .theme-toggle-info { display: flex; flex-direction: column; gap: 2px; }
 .theme-toggle-label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .theme-toggle-value { font-size: 0.75rem; color: var(--text-dim); }
 
+/* Switch de toggle — pill com animação suave */
 .theme-toggle {
-  position: relative; width: 52px; height: 28px;
-  background: var(--border); border: none; border-radius: 14px;
-  cursor: pointer; padding: 0; transition: background 0.3s;
+  position: relative;
+  width: 52px;
+  height: 28px;
+  background: var(--border);
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.3s;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Estado ativo — fundo azul da marca */
 .theme-toggle.active { background: var(--brand); }
+
+/* Thumb circular que desliza dentro do toggle */
 .theme-toggle-thumb {
-  position: absolute; top: 3px; left: 3px;
-  width: 22px; height: 22px; background: #fff; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
+
+/* Posição do thumb quando ativo */
 .theme-toggle.active .theme-toggle-thumb { transform: translateX(24px); }
+
+/* Ícones de lua (escuro) e sol (claro) dentro do thumb */
 .theme-toggle .icon-moon { display: block; color: #64748b; }
 .theme-toggle .icon-sun { display: none; color: #f59e0b; }
 .theme-toggle.active .icon-moon { display: none; }
 .theme-toggle.active .icon-sun { display: block; }
 
-.danger-zone { border-color: rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.04); }
-.danger-zone h3 { color: var(--red); }
-.danger-text { font-size: 0.75rem; color: var(--text-dim); text-align: center; margin-top: 8px; }
+/* ── Zona de perigo — reset de medição ──────────────────── */
 
+/* Seção com fundo e borda vermelhos sutis */
+.danger-zone {
+  border-color: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+/* Título da seção em vermelho */
+.danger-zone h3 { color: var(--red); }
+
+/* Texto descritivo abaixo do botão de reset */
+.danger-text {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* ── Lista de máquinas da linha ─────────────────────────── */
+
+/* Item da máquina — linha horizontal com drag handle, nome e ações */
 .maquina-item {
   display: flex;
   align-items: center;
@@ -39,15 +94,16 @@
   cursor: default;
 }
 
-.maquina-item:last-child {
-  border-bottom: none;
-}
+/* Remove separador do último item */
+.maquina-item:last-child { border-bottom: none; }
 
+/* Estado durante drag — opacidade reduzida com borda tracejada */
 .maquina-item.dragging {
   opacity: 0.4;
   border-bottom: 2px dashed var(--brand);
 }
 
+/* Handle de arrastar — cursor de mão */
 .drag-handle {
   cursor: grab;
   color: var(--text-dim);
@@ -56,10 +112,9 @@
   user-select: none;
 }
 
-.drag-handle:active {
-  cursor: grabbing;
-}
+.drag-handle:active { cursor: grabbing; }
 
+/* Número de ordem da máquina na sequência */
 .maquina-ordem {
   font-size: 0.75rem;
   font-weight: 600;
@@ -67,12 +122,14 @@
   min-width: 18px;
 }
 
+/* Nome da máquina — ocupa o espaço restante */
 .maquina-nome {
   flex: 1;
   color: var(--text);
   font-weight: 500;
 }
 
+/* Botões de ação da máquina (configurar ⋮ e remover ×) */
 .maquina-item .btn-icon {
   background: none;
   border: none;
@@ -85,10 +142,10 @@
   transition: color 0.15s;
 }
 
-.maquina-item .btn-icon:hover {
-  color: var(--red);
-}
+/* Destaque em vermelho ao passar o mouse */
+.maquina-item .btn-icon:hover { color: var(--red); }
 
+/* Mensagem de estado vazio na lista de máquinas */
 .empty-hint {
   font-size: 0.8125rem;
   color: var(--text-dim);

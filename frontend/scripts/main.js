@@ -140,6 +140,33 @@ function initGlobalModals() {
   });
 }
 
+// ============================================================
+// TOGGLE DE TEMA GLOBAL
+// ============================================================
+
+// Atualiza o ícone do botão de tema conforme o tema atual.
+// Sol = tema escuro ativo (clica para ir para claro)
+// Lua = tema claro ativo (clica para ir para escuro)
+function atualizarIconeTema() {
+  const isDark = store.getTheme() === 'dark';
+  const iconSun = document.getElementById('icon-sun');
+  const iconMoon = document.getElementById('icon-moon');
+  if (iconSun) iconSun.style.display = isDark ? 'block' : 'none';
+  if (iconMoon) iconMoon.style.display = isDark ? 'none' : 'block';
+}
+
+// Inicializa o botão de tema global disponível em todas as telas.
+function initThemeToggle() {
+  const btn = document.getElementById('btn-theme-toggle');
+  if (!btn) return;
+  atualizarIconeTema();
+  btn.addEventListener('click', () => {
+    const newTheme = store.getTheme() === 'dark' ? 'light' : 'dark';
+    store.setTheme(newTheme);
+    atualizarIconeTema();
+  });
+}
+
 // Tick global: roda a cada 1 segundo para atualizar timers,
 // verificar fim de turno e solicitar leituras de produção.
 setInterval(() => {
@@ -170,4 +197,5 @@ setInterval(() => {
 store.init();
 store.applyTheme();
 initGlobalModals();
+initThemeToggle();
 loadPage('medicao');

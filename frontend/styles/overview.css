@@ -1,7 +1,7 @@
 /* KPI values padrão da tela overview */
 .page-overview .kpi-value { color: var(--text); }
-.page-overview #ov-efficiency { color: var(--brand-light); }
-.page-overview #ov-oee { color: var(--brand-light); }
+.page-overview #ov-efficiency { color: var(--brand); }
+.page-overview #ov-oee { color: var(--brand); }
 
 /* Mensagem de estado vazio pequena — usada dentro de seções */
 .empty-state-sm {
@@ -25,6 +25,7 @@
   cursor: pointer;
   display: flex;
   align-items: center;
+  transition: all 0.15s;
 }
 
 /* Estado ativo — filtros aplicados */
@@ -41,11 +42,12 @@
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 12px;
-  animation: fadeIn 0.15s ease;
+  box-shadow: var(--shadow);
+  animation: fadeInDown 0.15s ease;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -93,50 +95,62 @@
 .fluxo-maquina-box {
   width: 72px;
   height: 72px;
-  border-radius: 16px;
-  border: 2.5px solid var(--border);
+  border-radius: 18px;
+  border: 2px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--text);
   text-transform: uppercase;
   position: relative;
   background: var(--bg-card);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  transition: transform 0.1s, box-shadow 0.1s;
+  box-shadow: var(--shadow);
+  transition: transform 0.12s, box-shadow 0.12s;
 }
 
 /* Feedback visual ao toque */
-.fluxo-maquina:active .fluxo-maquina-box { transform: scale(0.93); }
+.fluxo-maquina:active .fluxo-maquina-box {
+  transform: scale(0.92);
+  box-shadow: none;
+}
 
-/* Cores de borda por estado */
-.fluxo-maquina-box.rodando { border-color: var(--green); background: rgba(34,197,94,0.05); }
-.fluxo-maquina-box.parado { border-color: var(--red); background: rgba(239,68,68,0.05); }
-.fluxo-maquina-box.ultima_medicao { border-color: var(--brand); }
+/* Cores de borda e fundo por estado */
+.fluxo-maquina-box.rodando {
+  border-color: var(--green);
+  background: linear-gradient(135deg, rgba(22,163,74,0.06) 0%, var(--bg-card) 100%);
+}
+.fluxo-maquina-box.parado {
+  border-color: var(--red);
+  background: linear-gradient(135deg, rgba(220,38,38,0.06) 0%, var(--bg-card) 100%);
+}
+.fluxo-maquina-box.ultima_medicao {
+  border-color: var(--brand);
+  background: linear-gradient(135deg, rgba(25,97,192,0.06) 0%, var(--bg-card) 100%);
+}
 
 /* Indicador de status no canto superior direito da caixa */
 .fluxo-maquina-dot {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 10px;
-  height: 10px;
+  top: 7px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--border);
 }
 
-.fluxo-maquina-dot.rodando { background: var(--green); }
-.fluxo-maquina-dot.parado { background: var(--red); }
+.fluxo-maquina-dot.rodando { background: var(--green); box-shadow: 0 0 0 2px rgba(22,163,74,0.2); }
+.fluxo-maquina-dot.parado { background: var(--red); box-shadow: 0 0 0 2px rgba(220,38,38,0.2); }
 .fluxo-maquina-dot.ultima_medicao { background: var(--brand); }
 
 /* Nome da máquina abaixo da caixa — truncado se longo */
 .fluxo-maquina-nome {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: var(--text);
+  color: var(--text-muted);
   text-align: center;
   max-width: 80px;
   overflow: hidden;
@@ -152,19 +166,20 @@
 .fluxo-maquina-eficiencia.sem_informacao { color: var(--text-dim); }
 .fluxo-maquina-eficiencia.ultima_medicao { color: var(--brand); }
 
-/* Seta de conexão entre máquinas — colorida pelo estado da máquina anterior */
+/* Seta de conexão entre máquinas */
 .fluxo-seta {
-  font-size: 1.25rem;
-  padding: 0 6px;
+  font-size: 1rem;
+  padding: 0 4px;
   margin-bottom: 36px;
   flex-shrink: 0;
   color: var(--border);
+  opacity: 0.6;
 }
 
-.fluxo-seta.rodando { color: var(--green); }
-.fluxo-seta.parado { color: var(--red); }
+.fluxo-seta.rodando { color: var(--green); opacity: 1; }
+.fluxo-seta.parado { color: var(--red); opacity: 1; }
 .fluxo-seta.sem_informacao { color: var(--border); }
-.fluxo-seta.ultima_medicao { color: var(--brand); }
+.fluxo-seta.ultima_medicao { color: var(--brand); opacity: 1; }
 
 /* ============================================================
    CARDS DETALHADOS — legado, mantido para compatibilidade
@@ -176,6 +191,7 @@
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 12px;
+  box-shadow: var(--shadow);
 }
 
 .maquina-card-header {
@@ -189,16 +205,16 @@
 
 /* Badge de status colorido por estado */
 .maquina-card-status {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 3px 10px;
   border-radius: 20px;
 }
 
-.maquina-card-status.rodando { background: rgba(34,197,94,0.12); color: var(--green); }
-.maquina-card-status.parado { background: rgba(239,68,68,0.12); color: var(--red); }
+.maquina-card-status.rodando { background: var(--green-dim); color: var(--green); }
+.maquina-card-status.parado { background: var(--red-dim); color: var(--red); }
 .maquina-card-status.sem_informacao { background: var(--bg-card-alt); color: var(--text-dim); }
-.maquina-card-status.ultima_medicao { background: rgba(25,97,192,0.12); color: var(--brand); }
+.maquina-card-status.ultima_medicao { background: var(--brand-bg); color: var(--brand); }
 
 /* Grid 2 colunas para métricas da máquina */
 .maquina-card-metricas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -210,49 +226,51 @@
    MODAL DETALHES DA MÁQUINA — bottom sheet deslizante
    ============================================================ */
 
-/* Overlay escuro que cobre toda a tela — sem padding para o modal ocupar 100% da largura */
+/* Overlay escuro que cobre toda a tela */
 #modal-maquina-detalhes {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.4);
   z-index: 200;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   padding: 0 !important;
   align-items: stretch !important;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 #modal-maquina-detalhes.hidden { display: none !important; }
 
-/* Container do modal — altura fixa de 92vh para ocupar a tela toda */
+/* Container do modal — altura fixa com scroll interno */
 .modal-maquina {
   background: var(--bg-card);
-  border-radius: 20px 20px 0 0;
+  border-radius: 24px 24px 0 0;
   height: 92vh;
   overflow-y: auto;
   width: 100%;
-  animation: slideUp 0.25s ease;
+  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* Animação de entrada do modal de baixo para cima */
+/* Animação suave de entrada */
 @keyframes slideUp {
-  from { transform: translateY(60px); opacity: 0; }
+  from { transform: translateY(80px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* Indicador visual de arrasto no topo do modal */
+/* Handle de arrasto — pill cinza no topo */
 .modal-maquina-handle {
-  width: 36px;
+  width: 40px;
   height: 4px;
   background: var(--border);
   border-radius: 2px;
-  margin: 10px auto 0;
+  margin: 12px auto 0;
 }
 
 /* Header fixo com nome da máquina, status e botão de fechar */
 .modal-maquina-header {
-  padding: 16px 16px 12px;
+  padding: 16px 16px 14px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: flex-start;
@@ -264,7 +282,7 @@
   z-index: 1;
 }
 
-/* Coluna com nome e subtítulo do header */
+/* Coluna com nome e subtítulo */
 .modal-maquina-titulo { display: flex; flex-direction: column; gap: 4px; }
 
 /* Nome da máquina com dot de status inline */
@@ -277,13 +295,13 @@
   gap: 8px;
 }
 
-/* Subtítulo com estado da máquina */
+/* Subtítulo com estado */
 .modal-maquina-sub { font-size: 0.75rem; color: var(--text-dim); }
 
-/* Botão circular de fechar no canto direito do header */
+/* Botão circular de fechar */
 .modal-maquina-fechar {
   background: var(--bg);
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 50%;
   width: 32px;
   height: 32px;
@@ -293,9 +311,12 @@
   cursor: pointer;
   color: var(--text-dim);
   flex-shrink: 0;
+  transition: background 0.15s;
 }
 
-/* Grid 3 colunas de KPIs — 2 linhas: Produção/Eficiência/OEE e Parado/MTBF/MTTR */
+.modal-maquina-fechar:active { background: var(--border); }
+
+/* Grid 3 colunas de KPIs */
 .modal-maquina-kpis {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -311,17 +332,18 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  border: 1px solid var(--border);
 }
 
 .modal-kpi-label {
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   color: var(--text-dim);
   font-weight: 600;
 }
 
-.modal-kpi-value { font-size: 1.0625rem; font-weight: 700; color: var(--text); }
+.modal-kpi-value { font-size: 1rem; font-weight: 700; color: var(--text); }
 
 /* ============================================================
    GRÁFICO DONUT DE PARADAS — com tempo total no centro
@@ -333,7 +355,7 @@
 /* Linha horizontal: donut à esquerda + legenda à direita */
 .modal-donut-inner { display: flex; align-items: center; gap: 16px; }
 
-/* Wrapper do canvas com overlay de texto central */
+/* Wrapper do canvas com texto central sobreposto */
 .modal-donut-wrapper {
   position: relative;
   width: 140px;
@@ -341,7 +363,7 @@
   flex-shrink: 0;
 }
 
-/* Texto sobreposto ao centro do donut (tempo total + contador) */
+/* Texto no centro do donut */
 .modal-donut-center {
   position: absolute;
   inset: 0;
@@ -355,17 +377,13 @@
 .modal-donut-center-time { font-size: 1rem; font-weight: 700; color: var(--text); }
 .modal-donut-center-pct { font-size: 0.6875rem; color: var(--text-dim); }
 
-/* Legenda ao lado do donut — um item por motivo */
+/* Legenda ao lado do donut */
 .modal-donut-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-
 .modal-donut-legend-item { display: flex; flex-direction: column; gap: 2px; }
-
-/* Linha com dot colorido + nome do motivo */
 .modal-donut-legend-row { display: flex; align-items: center; gap: 6px; }
-
 .modal-donut-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
-/* Nome do motivo — truncado se longo */
+/* Nome do motivo truncado */
 .modal-donut-legend-nome {
   font-size: 0.75rem;
   font-weight: 600;
@@ -376,7 +394,7 @@
   max-width: 110px;
 }
 
-/* Detalhe com tempo e percentual, indentado abaixo do nome */
+/* Detalhe: tempo e percentual */
 .modal-donut-legend-detalhe { font-size: 0.6875rem; color: var(--text-dim); padding-left: 14px; }
 
 /* ============================================================
@@ -385,24 +403,23 @@
 
 .modal-eventos { padding: 0 16px 32px; }
 .modal-eventos h3 { margin-bottom: 12px; }
+.evento-timeline { display: flex; flex-direction: column; }
 
-.evento-timeline { display: flex; flex-direction: column; gap: 0; }
-
-/* Item de evento com hora, ícone e descrição */
+/* Item de evento */
 .evento-item { display: flex; gap: 10px; position: relative; }
 
-/* Linha vertical conectando eventos consecutivos */
+/* Linha vertical conectando eventos */
 .evento-item:not(:last-child)::before {
   content: '';
   position: absolute;
   left: 46px;
   top: 28px;
   bottom: -4px;
-  width: 2px;
+  width: 1px;
   background: var(--border);
 }
 
-/* Horário do evento — alinhado à direita, largura fixa */
+/* Horário do evento */
 .evento-hora {
   font-size: 0.6875rem;
   color: var(--text-dim);
@@ -412,7 +429,7 @@
   text-align: right;
 }
 
-/* Círculo com ícone por tipo de evento */
+/* Ícone circular por tipo */
 .evento-icone {
   width: 28px;
   height: 28px;
@@ -423,21 +440,20 @@
   flex-shrink: 0;
 }
 
-.evento-icone.parada { background: rgba(239,68,68,0.12); color: var(--red); }
-.evento-icone.marcha { background: rgba(34,197,94,0.12); color: var(--green); }
-.evento-icone.producao { background: rgba(59,130,246,0.12); color: #3b82f6; }
-.evento-icone.start { background: rgba(25,97,192,0.12); color: var(--brand); }
+.evento-icone.parada { background: var(--red-dim); color: var(--red); }
+.evento-icone.marcha { background: var(--green-dim); color: var(--green); }
+.evento-icone.producao { background: rgba(59,130,246,0.1); color: #3b82f6; }
+.evento-icone.start { background: var(--brand-bg); color: var(--brand); }
 
-/* Corpo do evento com tipo e motivo */
+/* Corpo do evento */
 .evento-body { padding: 4px 0 16px; }
 .evento-tipo { font-size: 0.8125rem; font-weight: 600; color: var(--text); }
 .evento-motivo { font-size: 0.75rem; color: var(--text-dim); margin-top: 1px; }
 
 /* ============================================================
-   DOT DE STATUS INLINE — usado no header do modal
+   DOT DE STATUS INLINE
    ============================================================ */
 
-/* Bolinha colorida inline ao lado do nome da máquina */
 .status-dot-inline {
   width: 9px;
   height: 9px;

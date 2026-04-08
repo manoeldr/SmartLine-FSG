@@ -1,107 +1,152 @@
+/* ============================================================
+   MEDICAO.CSS — Tela de medição manual
+   Timer central, botões marcha/parada e contadores de turno
+   ============================================================ */
+
+/* ── Timer central ──────────────────────────────────────── */
+
+/* Bloco principal do timer */
 .med-timer {
   text-align: center;
-  padding: 32px 0 24px;
+  padding: 40px 0 32px;
 }
+
+/* Label de estado — RODANDO / PARADO */
 .med-timer-label {
   display: block;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.625rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 8px;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
   color: var(--text-dim);
 }
+
 .med-timer-label.running { color: var(--green); }
 .med-timer-label.stopped { color: var(--red); }
+
+/* Valor do timer — fonte fina e elegante estilo display */
 .med-timer-value {
   display: block;
-  font-size: 3.5rem;
-  font-weight: 700;
+  font-size: 4rem;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -1px;
+  letter-spacing: -3px;
   color: var(--text);
   line-height: 1;
 }
+
+/* Nome da máquina abaixo do timer */
 .med-timer-sub {
   display: block;
   font-size: 0.8125rem;
   color: var(--text-dim);
-  margin-top: 8px;
+  margin-top: 12px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
+/* ── Botões Marcha / Parada ──────────────────────────────── */
+
+/* Grid de dois botões lado a lado */
 .med-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  padding: 0 8px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
+/* Botão base — grande, totalmente arredondado, ícone maior */
 .med-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 28px 16px;
-  border-radius: 16px;
-  border: 2px solid transparent;
-  font-size: 1rem;
+  gap: 12px;
+  padding: 32px 16px;
+  border-radius: 24px;
+  border: 1.5px solid transparent;
+  font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.32, 0.72, 0, 1);
   -webkit-tap-highlight-color: transparent;
+  letter-spacing: 0.3px;
 }
-.med-btn:active { transform: scale(0.95); }
 
+/* Ícones maiores dentro dos botões */
+.med-btn svg {
+  width: 36px;
+  height: 36px;
+}
+
+/* Feedback de toque */
+.med-btn:active { transform: scale(0.94); }
+
+/* Botão Marcha */
 .med-btn-marcha {
   background: var(--green-dim);
   color: var(--green);
-  border-color: rgba(34, 197, 94, 0.25);
+  border-color: rgba(22, 163, 74, 0.15);
 }
+
 .med-btn-marcha.active {
   background: var(--green);
   color: #fff;
   border-color: var(--green);
-  box-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
+  box-shadow: 0 12px 32px rgba(22, 163, 74, 0.35);
 }
 
+/* Botão Parada */
 .med-btn-parada {
   background: var(--red-dim);
   color: var(--red);
-  border-color: rgba(239, 68, 68, 0.25);
+  border-color: rgba(220, 38, 38, 0.15);
 }
+
 .med-btn-parada.active {
   background: var(--red);
   color: #fff;
   border-color: var(--red);
-  box-shadow: 0 0 30px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 12px 32px rgba(220, 38, 38, 0.35);
 }
 
+/* ── Contadores do turno ────────────────────────────────── */
+
+/* Grid 2x2 */
 .med-counters {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
+
+/* Card individual — sem borda, fundo limpo */
 .med-counter {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px 8px;
+  padding: 18px 10px;
   text-align: center;
+  box-shadow: var(--shadow);
 }
+
+/* Valor numérico */
 .med-counter-value {
   display: block;
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 600;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
 }
+
+/* Label descritivo */
 .med-counter-label {
   display: block;
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-top: 4px;
+  letter-spacing: 0.8px;
+  margin-top: 5px;
+  font-weight: 600;
 }

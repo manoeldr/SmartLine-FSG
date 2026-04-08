@@ -25,7 +25,7 @@ const defaultData = () => ({
     alarmCategories: ['Interna', 'Externa'],
     alarms: [],
     productionInterval: 30,
-    theme: 'dark',
+    theme: 'light',
   },
   measurement: {
     active: false,

@@ -1,6 +1,9 @@
 /* ============================================================
-   BADGES — indicadores de status em pill
+   COMPONENTS.CSS — Componentes reutilizáveis do SmartLine
+   Badges, cards, botões, inputs, modais, alarmes
    ============================================================ */
+
+/* ── Badges ─────────────────────────────────────────────── */
 
 .badge {
   font-size: 0.6875rem;
@@ -9,28 +12,28 @@
   border-radius: 20px;
   background: var(--bg-card-alt);
   color: var(--text-dim);
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
+
 .badge.badge-green { background: var(--green-dim); color: var(--green); }
 .badge.badge-red { background: var(--red-dim); color: var(--red); }
 .badge.badge-amber { background: var(--amber-dim); color: var(--amber); }
 
-/* ============================================================
-   SECTION CARD — container de seção com borda e padding
-   ============================================================ */
+/* ── Section card ────────────────────────────────────────── */
 
+/* Container de seção com fundo card, borda e sombra sutil */
 .section-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 12px;
+  box-shadow: var(--shadow);
 }
 
-/* ============================================================
-   INFO BAR — barra de info em 3 colunas (cliente, linha, turno)
-   ============================================================ */
+/* ── Info bar ─────────────────────────────────────────────  */
 
+/* Barra de 3 colunas para info contextual (cliente, linha, turno) */
 .info-bar {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -48,11 +51,12 @@
 
 .info-label {
   display: block;
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
   margin-bottom: 4px;
+  font-weight: 600;
 }
 
 .info-value {
@@ -65,10 +69,9 @@
   text-overflow: ellipsis;
 }
 
-/* ============================================================
-   KPI GRID — grade de indicadores principais (2 colunas)
-   ============================================================ */
+/* ── KPI grid ─────────────────────────────────────────────  */
 
+/* Grade 2 colunas de KPIs */
 .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
 
 /* Card base de KPI */
@@ -76,38 +79,36 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 16px;
+  box-shadow: var(--shadow);
 }
 
-/* Card em destaque — borda e fundo na cor da marca */
+/* Card em destaque — borda e fundo azul suave */
 .kpi-card.kpi-highlight {
-  border-color: var(--brand);
-  background: rgba(25, 97, 192, 0.08);
+  border-color: rgba(25, 97, 192, 0.2);
+  background: linear-gradient(135deg, rgba(25,97,192,0.06) 0%, var(--bg-card) 100%);
 }
 
 .kpi-label {
   display: block;
-  font-size: 0.6875rem;
+  font-size: 0.5625rem;
   color: var(--text-dim);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.6px;
+  font-weight: 600;
 }
 
 .kpi-value { display: block; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
 .kpi-unit { display: block; font-size: 0.6875rem; color: var(--text-dim); margin-top: 2px; }
 
-/* ============================================================
-   DOTS — indicadores coloridos circulares
-   ============================================================ */
+/* ── Dots ─────────────────────────────────────────────────  */
 
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .dot-green { background: var(--green); }
 .dot-red { background: var(--red); }
 
-/* ============================================================
-   BOTÕES
-   ============================================================ */
+/* ── Botões ───────────────────────────────────────────────  */
 
 .btn {
   display: inline-flex;
@@ -122,87 +123,108 @@
   cursor: pointer;
   transition: all 0.15s;
   -webkit-tap-highlight-color: transparent;
+  letter-spacing: 0.1px;
 }
 
 .btn:active { transform: scale(0.97); }
 
-/* Botão primário — fundo azul da marca */
+/* Primário — azul da marca */
 .btn-primary { background: var(--brand); color: #fff; width: 100%; }
 .btn-primary:active { background: var(--brand-dark); }
 
-/* Botão outline — borda sutil, sem fundo */
-.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); width: 100%; }
+/* Outline — borda sutil sem fundo */
+.btn-outline {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  width: 100%;
+}
 
-/* Botão de perigo — fundo vermelho para ações destrutivas */
+.btn-outline:active { background: var(--bg-card-alt); }
+
+/* Perigo — vermelho para ações destrutivas */
 .btn-danger { background: var(--red); color: #fff; }
+.btn-danger:active { background: #b91c1c; }
 
-/* Botão pequeno — usado em linhas de formulário */
-.btn-sm { padding: 8px 14px; font-size: 1.125rem; background: var(--brand); color: #fff; border-radius: var(--radius-sm); min-width: 44px; }
+/* Pequeno — usado em linhas de formulário */
+.btn-sm {
+  padding: 8px 14px;
+  font-size: 1.125rem;
+  background: var(--brand);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  min-width: 44px;
+}
 
-/* Modificador para ocupar 100% da largura */
+/* Modificador largura total */
 .btn-block { width: 100%; }
 
-/* ============================================================
-   INPUTS
-   ============================================================ */
+/* ── Inputs ───────────────────────────────────────────────  */
 
 .input {
   width: 100%;
   padding: 10px 14px;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 0.9375rem;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
 }
 
-.input:focus { border-color: var(--brand); }
+.input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(25, 97, 192, 0.1);
+}
 
-/* Input grande — usado para entrada de produção */
+/* Input grande para produção */
 .input-lg { font-size: 1.5rem; text-align: center; padding: 16px; font-weight: 700; }
 
-/* ============================================================
-   FORM GROUPS
-   ============================================================ */
+/* ── Form groups ──────────────────────────────────────────  */
 
 .form-group { margin-bottom: 14px; }
-.form-group label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px; }
+
+.form-group label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
 
 /* Linha horizontal de campos lado a lado */
 .form-row { display: flex; gap: 10px; }
 .flex-1 { flex: 1; }
 
-/* ============================================================
-   INDICATOR LIST — lista de indicadores com separadores
-   ============================================================ */
+/* ── Indicator list ───────────────────────────────────────  */
 
-.indicator-list { display: flex; flex-direction: column; gap: 0; }
+/* Lista de indicadores com linhas separadoras */
+.indicator-list { display: flex; flex-direction: column; }
 
 .indicator-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  padding: 11px 0;
   border-bottom: 1px solid var(--border);
   font-size: 0.8125rem;
 }
 
 .indicator-row:last-child { border-bottom: none; }
 .indicator-row span { color: var(--text-muted); }
-.indicator-row strong { color: var(--text); }
+.indicator-row strong { color: var(--text); font-weight: 600; }
 
-/* ============================================================
-   TIME BAR — barra de progresso dividida em rodando/parado
-   ============================================================ */
+/* ── Time bar ─────────────────────────────────────────────  */
 
+/* Barra de progresso dividida em rodando/parado */
 .time-bar-container { margin-top: 8px; }
 
 .time-bar {
   display: flex;
-  height: 10px;
-  border-radius: 5px;
+  height: 8px;
+  border-radius: 4px;
   overflow: hidden;
   background: var(--border);
 }
@@ -217,15 +239,12 @@
   font-size: 0.75rem;
 }
 
-.running-label { color: var(--green); display: flex; align-items: center; gap: 6px; }
-.stopped-label { color: var(--red); display: flex; align-items: center; gap: 6px; }
+.running-label { color: var(--green); display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.stopped-label { color: var(--red); display: flex; align-items: center; gap: 6px; font-weight: 500; }
 
-/* ============================================================
-   MODAL OVERLAY — fundo escuro para modais globais
-   Nota: o modal da máquina no overview tem CSS próprio
-   no overview.css e sobrescreve estes estilos.
-   ============================================================ */
+/* ── Modal overlay padrão ─────────────────────────────────  */
 
+/* Fundo escuro para modais globais */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -235,19 +254,22 @@
   justify-content: center;
   z-index: 200;
   padding: 16px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
-/* Container padrão de modal — centralizado com largura máxima */
+/* Container modal padrão — centralizado com largura máxima */
 .modal {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 20px 20px 12px 12px;
+  border-radius: 20px 20px 14px 14px;
   padding: 24px 20px;
   width: 100%;
   max-width: 480px;
-  max-height: 80vh;
+  max-height: 82vh;
   overflow-y: auto;
-  animation: slideUp 0.25s ease;
+  animation: slideUp 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  box-shadow: var(--shadow-md);
 }
 
 @keyframes slideUp {
@@ -256,16 +278,14 @@
 }
 
 .modal h3 { text-transform: none; font-size: 1.125rem; color: var(--text); margin-bottom: 4px; }
-.modal-sub { font-size: 0.8125rem; color: var(--text-dim); margin-bottom: 16px; }
+.modal-sub { font-size: 0.8125rem; color: var(--text-dim); margin-bottom: 16px; line-height: 1.5; }
 .modal-input-row { display: flex; gap: 8px; margin-bottom: 16px; }
 
-/* ============================================================
-   ALARM LIST — lista de alarmes/motivos de parada
-   ============================================================ */
+/* ── Alarm list ───────────────────────────────────────────  */
 
 .alarm-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 
-/* Label de categoria dentro da lista de alarmes */
+/* Label de categoria de alarme */
 .alarm-category-label {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -286,19 +306,19 @@
   justify-content: space-between;
   padding: 10px 14px;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 0.8125rem;
   color: var(--text);
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
 
-/* Estado ativo/selecionado do item de alarme */
+/* Estado ativo/selecionado */
 .alarm-item:active,
 .alarm-item.selected {
   border-color: var(--brand);
-  background: rgba(25, 97, 192, 0.1);
+  background: rgba(25, 97, 192, 0.06);
 }
 
 /* Botão de remover alarme */
@@ -309,4 +329,7 @@
   font-size: 1rem;
   cursor: pointer;
   padding: 0 4px;
+  transition: color 0.15s;
 }
+
+.alarm-item .remove-alarm:hover { color: var(--red); }
