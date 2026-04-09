@@ -1,0 +1,31 @@
+<div class="page page-login">
+
+  <!-- Logo fixa no topo como header -->
+  <div class="login-logo">
+    <img src="icons/sanmartin/sanmartin.svg" width="160" height="160" alt="SmartLine" style="filter:brightness(0) invert(1);">
+  </div>
+
+  <!-- Título + formulário centralizados -->
+  <div class="login-container">
+    <div class="login-header">
+      <h1 style="font-size:1.75rem;font-weight:700;">Smart Line Scan</h1>
+      <p style="font-size:0.875rem;margin-top:6px;">Auditoria de linha de produção</p>
+    </div>
+
+    <div class="login-form">
+      <div class="form-group">
+        <label>Login</label>
+        <input type="text" id="login-input" class="input" placeholder="Seu login" autocomplete="username" autocapitalize="none">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="senha-input" class="input" placeholder="Sua senha" autocomplete="current-password">
+      </div>
+      <p id="login-erro" class="login-erro hidden"></p>
+      <button type="button" class="btn btn-primary btn-block" id="btn-login" style="margin-top:8px;">
+        Entrar
+      </button>
+    </div>
+  </div>
+
+</div>

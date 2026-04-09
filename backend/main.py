@@ -7,22 +7,52 @@ from backend.routes.eventos import router as eventos_router
 from backend.routes.clientes import router as clientes_router
 from backend.routes.linhas import router as linhas_router
 from backend.routes.maquinas_linha import router as maquinas_router
+from backend.routes.auth import router as auth_router
 import backend.models.medicao
 import backend.models.evento
 import backend.models.cliente
 import backend.models.linha
 import backend.models.maquina_linha
+import backend.models.usuario
 
 Base.metadata.create_all(bind=engine)
 
-# Migrar coluna 'multiplicador_produto' (compatibilidade sem Alembic)
+# ============================================================
+# MIGRAÇÕES — compatibilidade sem Alembic
+# Adiciona colunas novas em tabelas existentes sem recriar o banco
+# ============================================================
+
 inspector = inspect(engine)
+
+# Migração: multiplicador_produto em maquinas_linha
 if 'maquinas_linha' in inspector.get_table_names():
     col_names = [c['name'] for c in inspector.get_columns('maquinas_linha')]
     if 'multiplicador_produto' not in col_names:
         with engine.connect() as conn:
             try:
                 conn.execute(text('ALTER TABLE maquinas_linha ADD COLUMN multiplicador_produto FLOAT DEFAULT 1'))
+                conn.commit()
+            except Exception:
+                pass
+
+# Migração: sobrevelocidade em maquinas_linha
+if 'maquinas_linha' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('maquinas_linha')]
+    if 'sobrevelocidade' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text('ALTER TABLE maquinas_linha ADD COLUMN sobrevelocidade FLOAT'))
+                conn.commit()
+            except Exception:
+                pass
+
+# Migração: maquina_linha_id em medicoes
+if 'medicoes' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('medicoes')]
+    if 'maquina_linha_id' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text('ALTER TABLE medicoes ADD COLUMN maquina_linha_id INTEGER'))
                 conn.commit()
             except Exception:
                 pass
@@ -37,6 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(medicoes_router)
 app.include_router(eventos_router)
 app.include_router(clientes_router)

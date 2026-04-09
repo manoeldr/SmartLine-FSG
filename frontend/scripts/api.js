@@ -1,20 +1,33 @@
 // ============================================================
 // API.JS — Camada de comunicação com o backend
-// Centraliza todas as chamadas fetch à API do SmartLine
+// Centraliza todas as chamadas fetch à API do SmartLine.
+// O token JWT é lido do sessionStorage e enviado em todas as requisições.
 // ============================================================
 
 const BASE_URL = 'http://127.0.0.1:5000';
 
-// Função genérica de requisição HTTP. Serializa o body em JSON e
-// lança um erro com a mensagem do backend em caso de resposta não-ok.
+// Função genérica de requisição HTTP.
+// Injeta automaticamente o token JWT do sessionStorage no header Authorization.
+// Lança erro 401 se o token estiver ausente ou inválido — o main.js redireciona para o login.
 async function request(method, path, body = null) {
+  const token = sessionStorage.getItem('smartline_token');
   const opts = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
   };
   if (body) opts.body = JSON.stringify(body);
   try {
     const r = await fetch(`${BASE_URL}${path}`, opts);
+    if (r.status === 401) {
+      // Token inválido ou expirado — limpa sessão e redireciona para login
+      sessionStorage.removeItem('smartline_token');
+      sessionStorage.removeItem('smartline_usuario');
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+      throw new Error('Sessão expirada');
+    }
     if (!r.ok) {
       const err = await r.json().catch(() => ({}));
       throw new Error(err.detail || `Erro ${r.status}`);
@@ -26,6 +39,51 @@ async function request(method, path, body = null) {
 }
 
 export const api = {
+
+  // ── Autenticação ──────────────────────────────────────────
+
+  // Realiza o login com login e senha. Não requer token.
+  // Retorna { token, usuario } em caso de sucesso.
+  async login(login, senha) {
+    const r = await fetch(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, senha }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || 'Login ou senha incorretos');
+    }
+    return r.json();
+  },
+
+  // Verifica se o token atual ainda é válido e retorna os dados do usuário.
+  // Usado ao recarregar a página para restaurar a sessão.
+  async me() {
+    return request('GET', '/auth/me');
+  },
+
+  // ── Usuários (somente admin) ──────────────────────────────
+
+  // Lista todos os usuários cadastrados.
+  async listarUsuarios() {
+    return request('GET', '/auth/usuarios');
+  },
+
+  // Cria um novo usuário com nome, login, senha e nível.
+  async criarUsuario(dados) {
+    return request('POST', '/auth/usuarios', dados);
+  },
+
+  // Remove um usuário pelo ID.
+  async deletarUsuario(id) {
+    return request('DELETE', `/auth/usuarios/${id}`);
+  },
+
+  // Altera a senha de um usuário.
+  async alterarSenha(id, novaSenha) {
+    return request('PATCH', `/auth/usuarios/${id}/senha?nova_senha=${encodeURIComponent(novaSenha)}`);
+  },
 
   // ── Clientes ──────────────────────────────────────────────
 
@@ -57,8 +115,7 @@ export const api = {
     return request('GET', `/linhas/${linhaId}/status`);
   },
 
-  // Retorna os dados agregados da linha para o Dashboard:
-  // produção e OEE da máquina crítica, eficiência média, paradas, MTBF e MTTR.
+  // Retorna os dados agregados da linha para o Dashboard.
   async dashboardLinha(linhaId) {
     return request('GET', `/linhas/${linhaId}/dashboard`);
   },
@@ -97,8 +154,7 @@ export const api = {
     return request('POST', '/medicoes/', dados);
   },
 
-  // Registra um evento na medição ativa (marcha, parada ou produção),
-  // com motivo e leitura de produção opcionais.
+  // Registra um evento na medição ativa (marcha, parada ou produção).
   async registrarEvento(medicaoId, tipo, motivo = null, producaoLeitura = null) {
     return request('POST', `/medicoes/${medicaoId}/eventos/`, {
       tipo,
@@ -108,12 +164,11 @@ export const api = {
   },
 
   // Atualiza o motivo de um evento de parada específico.
-  // Chamado após o auditor confirmar o motivo no modal de parada.
   async atualizarMotivoEvento(medicaoId, eventoId, motivo) {
     return request('PATCH', `/medicoes/${medicaoId}/eventos/${eventoId}/motivo?motivo=${encodeURIComponent(motivo)}`);
   },
 
-  // Finaliza uma medição informando a produção final. Define o timestamp_fim no backend.
+  // Finaliza uma medição informando a produção final.
   async finalizarMedicao(medicaoId, producaoFinal) {
     return request('PATCH', `/medicoes/${medicaoId}/finalizar`, {
       producao_final: producaoFinal,
@@ -143,15 +198,13 @@ export const api = {
   },
 
   // Retorna a medição ativa de uma máquina e seus eventos.
-  // Usado para recuperar o estado após reinicialização do dispositivo.
   async medicaoAtiva(maquinaLinhaId) {
     return request('GET', `/medicoes/ativa?maquina_linha_id=${maquinaLinhaId}`);
   },
 
   // ── Filtros ──────────────────────────────────────────────
 
-  // Retorna os valores disponíveis para filtros no overview:
-  // lista de clientes, turnos e datas com medições registradas na linha.
+  // Retorna os valores disponíveis para filtros no overview.
   async filtrosDisponiveis(linhaId) {
     return request('GET', `/medicoes/filtros-disponiveis?linha_id=${linhaId}`);
   },
