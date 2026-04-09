@@ -264,14 +264,14 @@ function renderMaquinas() {
   }
 
   list.innerHTML = estadoConfig.maquinas.map((m) => {
-    const semVelocidade = !m.velocidade_nominal;
+    const faltaVar = (!m.velocidade_nominal || m.sobrevelocidade === null || m.sobrevelocidade === undefined || m.sobrevelocidade === '');
     return `
       <div class="maquina-item" draggable="true" data-id="${m.id}">
         <span class="drag-handle">⠿</span>
         <span class="maquina-ordem">${m.ordem}</span>
         <span class="maquina-nome">${m.nome}</span>
         ${m.critica ? '<span style="color:var(--brand);font-size:1rem;margin-right:4px;">★</span>' : ''}
-        ${semVelocidade ? '<span style="color:var(--red);font-size:0.65rem;margin-right:4px;">⚠ vel.</span>' : ''}
+        ${faltaVar ? '<span style="color:var(--red);font-size:0.65rem;margin-right:4px;" title="Velocidade ou Sobrevelocidade pendente">⚠ config</span>' : ''}
         <button type="button" class="btn-icon config-maquina"
           data-id="${m.id}"
           data-nome="${m.nome}"
@@ -400,7 +400,7 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
       </div>
 
       <div class="form-group">
-        <label>Sobrevelocidade (% acima da nominal)</label>
+        <label>Sobrevelocidade (% acima da nominal) <span style="color:var(--red)">*</span></label>
         <input type="number" step="0.1" min="0" id="modal-maq-sobrevelocidade" class="input" placeholder="Ex: 10 (significa 10% acima)" value="${sobrevelocidade}" inputmode="numeric">
         <p class="modal-sub" style="margin-top:4px;">Velocidade máxima para compensar paradas na linha.</p>
       </div>
@@ -496,13 +496,17 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
     const sobrevelocidadeVal = sobrevelocidadeRaw !== '' ? parseFloat(sobrevelocidadeRaw) : null;
     const multiplicadorVal = parseFloat(document.getElementById('modal-maq-multiplicador').value) || 1;
 
-    if (!velocidadeVal) {
-      document.getElementById('modal-maq-velocidade').style.borderColor = 'var(--red)';
-      showToast('Informe a velocidade nominal', 'erro');
+    if (!velocidadeVal || sobrevelocidadeVal === null || sobrevelocidadeVal === undefined || sobrevelocidadeVal === '') {
+      if (!velocidadeVal) document.getElementById('modal-maq-velocidade').style.borderColor = 'var(--red)';
+      if (sobrevelocidadeVal === null || sobrevelocidadeVal === undefined || sobrevelocidadeVal === '') {
+        document.getElementById('modal-maq-sobrevelocidade').style.borderColor = 'var(--red)';
+      }
+      showToast('Velocidade nominal e Sobrevelocidade são obrigatórios', 'erro');
       return;
     }
 
     document.getElementById('modal-maq-velocidade').style.borderColor = '';
+    document.getElementById('modal-maq-sobrevelocidade').style.borderColor = '';
 
     try {
       await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, {

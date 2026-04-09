@@ -289,7 +289,7 @@ async function abrirModalIniciar() {
         <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}" style="justify-content:flex-start;">
           <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
           <span>${m.nome}</span>
-          ${!m.velocidade_nominal ? '<span style="margin-left:auto;font-size:0.65rem;color:var(--amber);font-weight:600;">⚠ sem velocidade</span>' : ''}
+          ${(!m.velocidade_nominal || m.sobrevelocidade === null || m.sobrevelocidade === undefined || m.sobrevelocidade === '') ? '<span style="margin-left:auto;font-size:0.65rem;color:var(--amber);font-weight:600;">⚠ config.</span>' : ''}
         </div>
       `).join('');
 
@@ -335,10 +335,12 @@ async function abrirModalIniciar() {
       } catch { /* silencioso */ }
 
       const rawSpeed = Number(maquinaDetalhes?.velocidade_nominal ?? store.config.speed) || 0;
+      const sobrevel = maquinaDetalhes?.sobrevelocidade;
+      const missingSobrevel = sobrevel === null || sobrevel === undefined || sobrevel === '';
 
-      // Bloqueia início se velocidade nominal não estiver configurada
-      if (!rawSpeed || rawSpeed === 0) {
-        mostrarAvisoModal('Esta máquina não tem velocidade nominal configurada. Configure em Config antes de iniciar.');
+      // Bloqueia início se velocidade nominal ou sobrevelocidade não estiverem configuradas
+      if (!rawSpeed || rawSpeed === 0 || missingSobrevel) {
+        mostrarAvisoModal('A máquina precisa ter velocidade nominal e sobrevelocidade informadas para iniciar medição.');
         vibrate([100, 50, 100]);
         return;
       }
