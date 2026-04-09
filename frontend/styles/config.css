@@ -152,3 +152,52 @@
   text-align: center;
   padding: 12px 0;
 }
+
+/* Espaçamento em Configuração para os 2 botões flutuantes (Tema e Usuários) */
+.page-config .page-header {
+  padding-right: 108px;
+}
+
+/* ── Botão de Gestão de Usuários (Header) ───────────────── */
+#cfg-usuarios-btn {
+  position: fixed;
+  top: 20px;
+  right: 64px; /* 16px da margem + 36px do botao tema + 12px de gap */
+  z-index: 150;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+}
+
+#cfg-usuarios-btn:active {
+  transform: scale(0.90);
+}
+
+#cfg-usuarios-btn:hover,
+#cfg-usuarios-btn:active {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+#cfg-usuarios-btn:hover img,
+#cfg-usuarios-btn:active img {
+  filter: brightness(0) invert(1) !important;
+}
+
+#cfg-usuarios-icon {
+  filter: brightness(0);
+  transition: filter 0.15s;
+}
+
+[data-theme="dark"] #cfg-usuarios-icon {
+  filter: brightness(0) invert(1);
+}
