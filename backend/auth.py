@@ -2,6 +2,7 @@ import os
 import uuid
 import jwt
 import bcrypt
+import time
 from datetime import datetime
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -14,8 +15,8 @@ from backend.database import get_db
 # Isso invalida todos os tokens quando o servidor reinicia.
 # ============================================================
 
-# Gerada uma vez por processo — muda a cada restart do servidor
-SECRET_KEY = str(uuid.uuid4())
+# SECRET_KEY estática para evitar expiração em reinícios do servidor (como --reload)
+SECRET_KEY = os.environ.get("SECRET_KEY", "smartline-secret-key-stable")
 ALGORITHM = "HS256"
 
 bearer_scheme = HTTPBearer()
@@ -38,7 +39,7 @@ def criar_token(usuario_id: int, nivel: str) -> str:
     payload = {
         "sub": str(usuario_id),
         "nivel": nivel,
-        "iat": datetime.utcnow().timestamp(),
+        "iat": time.time(),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

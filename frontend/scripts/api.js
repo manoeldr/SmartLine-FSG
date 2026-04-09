@@ -60,7 +60,15 @@ export const api = {
   // Verifica se o token atual ainda é válido e retorna os dados do usuário.
   // Usado ao recarregar a página para restaurar a sessão.
   async me() {
-    return request('GET', '/auth/me');
+    const token = sessionStorage.getItem('smartline_token');
+    const r = await fetch(`${BASE_URL}/auth/me`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!r.ok) throw new Error('Token inválido');
+    return r.json();
   },
 
   // ── Usuários (somente admin) ──────────────────────────────

@@ -40,6 +40,7 @@ export function initLogin(onSuccess) {
     try {
       const resultado = await api.login(login, senha);
       sessionStorage.setItem('smartline_token', resultado.token);
+      console.log('Token salvo:', sessionStorage.getItem('smartline_token'));
       sessionStorage.setItem('smartline_usuario', JSON.stringify(resultado.usuario));
       onSuccess(resultado.usuario);
     } catch (err) {

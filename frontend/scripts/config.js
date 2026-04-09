@@ -2,6 +2,7 @@
 // CONFIG.JS — Tela de configuração
 // Seções: Cliente, Linha, Fluxo da linha,
 // Configuração da medição (turno, intervalo de produção)
+// Gestão de usuários (somente admin)
 // ============================================================
 
 import { store } from './store.js';
@@ -26,6 +27,7 @@ export function initConfig() {
     configurarBotaoAdicionarMaquina();
     configurarBotaoSalvar();
     configurarBotaoReset();
+    configurarBotaoUsuarios();
     preencherConfigMedicao();
     carregarClientes();
   }, 50);
@@ -69,7 +71,6 @@ async function carregarClientes() {
 }
 
 // Configura o listener do select de cliente.
-// Ao trocar o cliente, limpa linha e máquinas e salva o novo clienteId no store.
 function configurarSelectCliente() {
   const select = document.getElementById('cfg-cliente-select');
   if (!select || select.dataset.listenerAdded) return;
@@ -90,7 +91,6 @@ function configurarSelectCliente() {
 }
 
 // Configura o botão de adicionar cliente.
-// Cria o cliente no backend, adiciona ao select e dispara o evento de change.
 function configurarBotaoAdicionarCliente() {
   const btn = document.getElementById('cfg-cliente-add-btn');
   if (!btn) return;
@@ -124,7 +124,6 @@ function configurarBotaoAdicionarCliente() {
 // ============================================================
 
 // Busca as linhas do cliente selecionado e popula o select.
-// Guard `carregandoLinhas` evita chamadas simultâneas que causariam duplicação.
 async function carregarLinhas(clienteId) {
   if (carregandoLinhas) return;
   carregandoLinhas = true;
@@ -158,7 +157,6 @@ async function carregarLinhas(clienteId) {
 }
 
 // Configura o listener do select de linha.
-// Ao trocar a linha, limpa as máquinas e salva o novo linhaId no store imediatamente.
 function configurarSelectLinha() {
   const select = document.getElementById('cfg-linha-select');
   if (!select || select.dataset.listenerAdded) return;
@@ -172,7 +170,6 @@ function configurarSelectLinha() {
 }
 
 // Configura o botão de adicionar linha.
-// Cria a linha no backend vinculada ao cliente atual e dispara o evento de change.
 function configurarBotaoAdicionarLinha() {
   const btn = document.getElementById('cfg-linha-add-btn');
   if (!btn) return;
@@ -201,7 +198,7 @@ function configurarBotaoAdicionarLinha() {
   });
 }
 
-// Reseta o select de linhas e oculta a seção. Também limpa as máquinas.
+// Reseta o select de linhas e oculta a seção.
 function limparLinhas() {
   const select = document.getElementById('cfg-linha-select');
   const section = document.getElementById('cfg-linha-section');
@@ -215,7 +212,6 @@ function limparLinhas() {
 // ============================================================
 
 // Busca as máquinas da linha e renderiza o fluxo.
-// Guard `carregandoMaquinas` evita chamadas simultâneas.
 async function carregarMaquinas(linhaId) {
   if (carregandoMaquinas) return;
   carregandoMaquinas = true;
@@ -235,7 +231,6 @@ async function carregarMaquinas(linhaId) {
 }
 
 // Configura o botão de adicionar máquina.
-// Define a ordem como o próximo número da sequência e cria no backend.
 function configurarBotaoAdicionarMaquina() {
   const btn = document.getElementById('cfg-maquina-add-btn');
   if (!btn) return;
@@ -261,8 +256,6 @@ function configurarBotaoAdicionarMaquina() {
 }
 
 // Renderiza a lista de máquinas com drag-and-drop para reordenação.
-// Máquinas críticas exibem ★. Cada item tem botão ⋮ para configurar e × para remover.
-// Exibe indicador visual se velocidade nominal não estiver configurada.
 function renderMaquinas() {
   const list = document.getElementById('cfg-maquinas-list');
   if (estadoConfig.maquinas.length === 0) {
@@ -389,9 +382,6 @@ function limparMaquinas() {
 // MODAL: CONFIGURAR MÁQUINA
 // ============================================================
 
-// Abre o modal de configuração de uma máquina específica.
-// Todos os campos são exibidos independente de ser crítica ou não.
-// Velocidade nominal obrigatória. Toggle crítica define a máquina referência da linha.
 function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, multiplicador = 1, critica = false, alarmes) {
   document.getElementById('modal-config-maquina')?.remove();
 
@@ -453,7 +443,6 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
   `;
   document.body.appendChild(modal);
 
-  // Toggle crítica — apenas muda o label
   let criticaAtual = critica;
   const toggle = document.getElementById('modal-maq-critica-toggle');
   const label = document.getElementById('modal-maq-critica-label');
@@ -466,7 +455,6 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
 
   let alarmesList = [...alarmes];
 
-  // Renderiza a lista de alarmes com botão de remoção por índice.
   function renderAlarmesList() {
     const list = document.getElementById('modal-maq-alarm-list');
     if (alarmesList.length === 0) {
@@ -489,7 +477,6 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
 
   renderAlarmesList();
 
-  // Adiciona novo alarme à lista local ao clicar no botão +.
   document.getElementById('modal-maq-add-alarm').addEventListener('click', () => {
     const input = document.getElementById('modal-maq-new-alarm');
     const cat = document.getElementById('modal-maq-new-alarm-cat').value;
@@ -502,7 +489,6 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
     input.value = '';
   });
 
-  // Salva todas as configurações no backend. Valida velocidade nominal obrigatória.
   document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
     const velocidadeRaw = document.getElementById('modal-maq-velocidade').value.trim();
     const velocidadeVal = velocidadeRaw !== '' ? parseFloat(velocidadeRaw) : null;
@@ -554,7 +540,6 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
 // SEÇÃO 4 — CONFIGURAÇÃO DA MEDIÇÃO
 // ============================================================
 
-// Preenche os campos da seção de medição com os valores salvos no store.
 function preencherConfigMedicao() {
   const cfg = store.config;
   document.getElementById('cfg-shift-start').value = cfg.shiftStart || '08:00';
@@ -562,7 +547,6 @@ function preencherConfigMedicao() {
   document.getElementById('cfg-prod-interval').value = cfg.productionInterval || 30;
 }
 
-// Configura o botão salvar. Persiste cliente, linha, turno e intervalo no store.
 function configurarBotaoSalvar() {
   const btn = document.getElementById('cfg-save-btn');
   if (!btn) return;
@@ -579,7 +563,6 @@ function configurarBotaoSalvar() {
   });
 }
 
-// Configura o botão de reset. Apaga todos os dados da medição ativa após confirmação.
 function configurarBotaoReset() {
   const btn = document.getElementById('cfg-reset-btn');
   if (!btn) return;
@@ -592,11 +575,183 @@ function configurarBotaoReset() {
 }
 
 // ============================================================
+// GESTÃO DE USUÁRIOS — visível apenas para admin
+// ============================================================
+
+// Exibe o botão de usuários no header somente para admin e configura o listener.
+function configurarBotaoUsuarios() {
+  const btn = document.getElementById('cfg-usuarios-btn');
+  if (!btn) return;
+
+  const usuario = window.usuarioAtual;
+  if (usuario?.nivel === 'admin') {
+    btn.classList.remove('hidden');
+    btn.style.display = 'flex';
+  }
+
+  btn.addEventListener('click', abrirModalUsuarios);
+}
+
+// Abre o modal de gestão de usuários com lista e formulário de criação.
+async function abrirModalUsuarios() {
+  document.getElementById('modal-usuarios')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-usuarios';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal">
+      <h3>Gestão de usuários</h3>
+      <p class="modal-sub">Cadastre e gerencie os acessos ao SmartLine</p>
+
+      <div id="modal-usuarios-list" style="margin-bottom:20px;"></div>
+
+      <p style="font-size:0.875rem;font-weight:600;color:var(--text);margin-bottom:12px;">Novo usuário</p>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label>Nome</label>
+          <input type="text" id="novo-usuario-nome" class="input" placeholder="Ex: João">
+        </div>
+        <div class="form-group flex-1">
+          <label>Sobrenome</label>
+          <input type="text" id="novo-usuario-sobrenome" class="input" placeholder="Ex: Silva">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Usuário (gerado automaticamente)</label>
+        <input type="text" id="novo-usuario-login" class="input" placeholder="nome.sobrenome" readonly
+          style="color:var(--text-dim);background:var(--bg);cursor:default;">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="novo-usuario-senha" class="input" placeholder="Mínimo 6 caracteres">
+      </div>
+      <div class="form-group">
+        <label>Nível de acesso</label>
+        <select id="novo-usuario-nivel" class="input">
+          <option value="auditor">Auditor</option>
+          <option value="cliente">Cliente</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-block" id="btn-criar-usuario">Criar usuário</button>
+      <button type="button" class="btn btn-outline btn-block" id="btn-fechar-usuarios" style="margin-top:8px;">Fechar</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  // Gera login automaticamente ao digitar nome ou sobrenome
+  const nomeInput = document.getElementById('novo-usuario-nome');
+  const sobrenomeInput = document.getElementById('novo-usuario-sobrenome');
+  const loginInput = document.getElementById('novo-usuario-login');
+
+  function atualizarLogin() {
+    const nome = nomeInput.value.trim().toLowerCase().replace(/\s+/g, '');
+    const sobrenome = sobrenomeInput.value.trim().toLowerCase().replace(/\s+/g, '');
+    loginInput.value = nome && sobrenome ? `${nome}.${sobrenome}` : nome || sobrenome || '';
+  }
+
+  nomeInput.addEventListener('input', atualizarLogin);
+  sobrenomeInput.addEventListener('input', atualizarLogin);
+
+  // Fecha ao clicar no overlay ou no botão fechar
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  document.getElementById('btn-fechar-usuarios').addEventListener('click', () => modal.remove());
+
+  // Cria novo usuário
+  document.getElementById('btn-criar-usuario').addEventListener('click', async () => {
+    const nome = nomeInput.value.trim();
+    const sobrenome = sobrenomeInput.value.trim();
+    const login = loginInput.value.trim();
+    const senha = document.getElementById('novo-usuario-senha').value;
+    const nivel = document.getElementById('novo-usuario-nivel').value;
+
+    if (!nome || !sobrenome) { showToast('Informe nome e sobrenome', 'erro'); return; }
+    if (!senha || senha.length < 6) { showToast('Senha deve ter pelo menos 6 caracteres', 'erro'); return; }
+
+    try {
+      await api.criarUsuario({ nome: `${nome} ${sobrenome}`, login, senha, nivel });
+      showToast('Usuário criado');
+      nomeInput.value = '';
+      sobrenomeInput.value = '';
+      loginInput.value = '';
+      document.getElementById('novo-usuario-senha').value = '';
+      await renderListaUsuarios();
+    } catch (err) {
+      showToast(err.message || 'Erro ao criar usuário', 'erro');
+    }
+  });
+
+  await renderListaUsuarios();
+}
+
+// Renderiza a lista de usuários com opções de deletar e redefinir senha.
+async function renderListaUsuarios() {
+  const list = document.getElementById('modal-usuarios-list');
+  if (!list) return;
+
+  try {
+    const usuarios = await api.listarUsuarios();
+    const usuarioAtual = window.usuarioAtual;
+
+    if (usuarios.length === 0) {
+      list.innerHTML = '<p style="font-size:0.8rem;color:var(--text-dim);text-align:center;padding:8px 0;">Nenhum usuário cadastrado</p>';
+      return;
+    }
+
+    list.innerHTML = usuarios.map(u => `
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;">
+          <div style="font-size:0.875rem;font-weight:600;color:var(--text);">${u.nome}</div>
+          <div style="font-size:0.75rem;color:var(--text-dim);">${u.login} · ${u.nivel}</div>
+        </div>
+        ${u.id !== usuarioAtual?.id ? `
+          <button type="button" class="btn-reset-senha" data-id="${u.id}" title="Redefinir senha"
+            style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:1rem;padding:4px;">🔑</button>
+          <button type="button" class="btn-deletar-usuario" data-id="${u.id}" title="Remover"
+            style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1.25rem;padding:4px;">×</button>
+        ` : '<span style="font-size:0.7rem;color:var(--brand);font-weight:600;padding:4px;">você</span>'}
+      </div>
+    `).join('');
+
+    // Deletar usuário
+    list.querySelectorAll('.btn-deletar-usuario').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Remover este usuário?')) return;
+        try {
+          await api.deletarUsuario(parseInt(btn.dataset.id));
+          showToast('Usuário removido');
+          await renderListaUsuarios();
+        } catch (err) {
+          showToast(err.message || 'Erro ao remover', 'erro');
+        }
+      });
+    });
+
+    // Redefinir senha
+    list.querySelectorAll('.btn-reset-senha').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const nova = prompt('Nova senha (mínimo 6 caracteres):');
+        if (!nova || nova.length < 6) { showToast('Senha muito curta', 'erro'); return; }
+        try {
+          await api.alterarSenha(parseInt(btn.dataset.id), nova);
+          showToast('Senha alterada');
+        } catch (err) {
+          showToast(err.message || 'Erro ao alterar senha', 'erro');
+        }
+      });
+    });
+
+  } catch {
+    list.innerHTML = '<p style="font-size:0.8rem;color:var(--red);">Erro ao carregar usuários</p>';
+  }
+}
+
+// ============================================================
 // TOAST
 // ============================================================
 
-// Exibe uma notificação temporária no topo da tela.
-// tipo: 'ok' (verde) | 'erro' (vermelho). Some após 2.5 segundos.
 function showToast(message, tipo = 'ok') {
   const existing = document.querySelector('.toast');
   if (existing) existing.remove();

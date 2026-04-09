@@ -113,6 +113,8 @@ function logout() {
   sessionStorage.removeItem('smartline_usuario');
   usuarioAtual = null;
   store.resetMeasurement();
+  document.getElementById('modal-usuarios')?.remove();
+  document.getElementById('modal-config-maquina')?.remove();
   mostrarLogin();
 }
 
