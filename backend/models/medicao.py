@@ -17,6 +17,7 @@ class Medicao(Base):
     timestamp_inicio: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     timestamp_fim: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     maquina_linha_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("maquinas_linha.id"), nullable=True)
+    usuario_nome: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     eventos: Mapped[list["Evento"]] = relationship("Evento", back_populates="medicao")
     maquina_linha: Mapped["MaquinaLinha"] = relationship("MaquinaLinha", back_populates="medicoes")

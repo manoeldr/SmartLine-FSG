@@ -5,6 +5,7 @@ from .evento import EventoResponse
 
 # Schema de criação de medição. Recebe os dados do auditor ao iniciar uma medição.
 # maquina_linha_id é opcional para compatibilidade com medições antigas.
+# usuario_nome armazena o nome do auditor que iniciou a medição.
 class MedicaoCreate(BaseModel):
     cliente: str
     maquina: str
@@ -13,6 +14,7 @@ class MedicaoCreate(BaseModel):
     velocidade_nominal: float
     producao_inicial: int
     maquina_linha_id: int | None = None
+    usuario_nome: str | None = None
 
 
 # Schema de atualização de medição. Usado ao finalizar — define produção final e timestamp.
@@ -36,6 +38,7 @@ class MedicaoResponse(BaseModel):
     timestamp_fim: datetime | None
     maquina_linha_id: int | None = None
     linha_id: int | None = None
+    usuario_nome: str | None = None
     eventos: list[EventoResponse] = []
 
     model_config = {"from_attributes": True}

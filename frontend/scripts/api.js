@@ -210,6 +210,11 @@ export const api = {
     return request('GET', `/medicoes/ativa?maquina_linha_id=${maquinaLinhaId}`);
   },
 
+  // Retorna todas as máquinas com status de ocupação e nome do auditor.
+  async ocupacaoMaquinas(linhaId) {
+    return request('GET', `/linhas/${linhaId}/maquinas/ocupacao`);
+  },
+
   // ── Filtros ──────────────────────────────────────────────
 
   // Retorna os valores disponíveis para filtros no overview.

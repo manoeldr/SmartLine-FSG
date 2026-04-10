@@ -4,6 +4,7 @@ from backend.database import get_db
 from backend.models.maquina_linha import MaquinaLinha
 from backend.models.linha import Linha
 from backend.models.medicao import Medicao
+from backend.models.usuario import Usuario
 from backend.schemas.maquina_linha import MaquinaLinhaCreate, MaquinaLinhaUpdate, MaquinaLinhaResponse
 
 router = APIRouter(prefix="/linhas/{linha_id}/maquinas", tags=["maquinas"])
@@ -35,6 +36,55 @@ def listar_maquinas(linha_id: int, db: Session = Depends(get_db)):
     if not linha:
         raise HTTPException(status_code=404, detail="Linha não encontrada")
     return db.query(MaquinaLinha).filter(MaquinaLinha.linha_id == linha_id).order_by(MaquinaLinha.ordem).all()
+
+
+# Retorna todas as máquinas da linha com status de ocupação.
+# Para cada máquina ocupada, retorna o nome do auditor que está medindo.
+# Usado no modal de início de medição para mostrar quem está em cada máquina.
+@router.get("/ocupacao")
+def ocupacao_maquinas(linha_id: int, db: Session = Depends(get_db)):
+    linha = db.query(Linha).filter(Linha.id == linha_id).first()
+    if not linha:
+        raise HTTPException(status_code=404, detail="Linha não encontrada")
+
+    maquinas = db.query(MaquinaLinha).filter(
+        MaquinaLinha.linha_id == linha_id
+    ).order_by(MaquinaLinha.ordem).all()
+
+    # Busca medições ativas (sem timestamp_fim) para cada máquina
+    medicoes_ativas = db.query(Medicao).filter(
+        Medicao.maquina_linha_id.in_([m.id for m in maquinas]),
+        Medicao.timestamp_fim.is_(None)
+    ).all()
+
+    # Monta dict: maquina_id -> medicao ativa
+    ocupacao = {m.maquina_linha_id: m for m in medicoes_ativas}
+
+    resultado = []
+    for maquina in maquinas:
+        medicao_ativa = ocupacao.get(maquina.id)
+        auditor_nome = None
+
+        if medicao_ativa:
+            # Tenta buscar o nome do auditor pelo campo `maquina` da medição
+            # (que armazena o nome da máquina, não do usuário — usamos o campo cliente como fallback)
+            auditor_nome = medicao_ativa.usuario_nome or medicao_ativa.cliente or "Em medição"
+
+        resultado.append({
+            "id": maquina.id,
+            "nome": maquina.nome,
+            "ordem": maquina.ordem,
+            "linha_id": maquina.linha_id,
+            "velocidade_nominal": maquina.velocidade_nominal,
+            "sobrevelocidade": maquina.sobrevelocidade,
+            "multiplicador_produto": maquina.multiplicador_produto,
+            "alarmes": maquina.alarmes,
+            "critica": maquina.critica,
+            "ocupada": medicao_ativa is not None,
+            "auditor": auditor_nome,
+        })
+
+    return resultado
 
 
 # Retorna apenas as máquinas sem medição ativa no momento.
@@ -77,7 +127,6 @@ def atualizar_maquina(linha_id: int, maquina_id: int, dados: MaquinaLinhaUpdate,
         maquina.multiplicador_produto = dados.multiplicador_produto
     if dados.critica is not None:
         if dados.critica:
-            # Desmarca todas as outras máquinas da linha como crítica
             db.query(MaquinaLinha).filter(
                 MaquinaLinha.linha_id == linha_id,
                 MaquinaLinha.id != maquina_id
@@ -88,7 +137,7 @@ def atualizar_maquina(linha_id: int, maquina_id: int, dados: MaquinaLinhaUpdate,
     return maquina
 
 
-# Remove uma máquina da linha. Não permite remoção se houver medições vinculadas.
+# Remove uma máquina da linha.
 @router.delete("/{maquina_id}")
 def deletar_maquina(linha_id: int, maquina_id: int, db: Session = Depends(get_db)):
     maquina = db.query(MaquinaLinha).filter(MaquinaLinha.id == maquina_id, MaquinaLinha.linha_id == linha_id).first()

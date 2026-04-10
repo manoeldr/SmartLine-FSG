@@ -83,8 +83,6 @@ export const store = {
       this._data = defaultData();
     }
     this.save();
-
-    // Inicia o timer de sincronização periódica com o backend
     this._startSyncTimer();
   },
 
@@ -137,7 +135,6 @@ export const store = {
   },
 
   // Envia para o backend os eventos ainda não sincronizados desde o último sync.
-  // Controla o índice do último evento sincronizado para evitar duplicatas.
   async syncToBackend() {
     const m = this._data.measurement;
     if (!m.medicaoId || !m.active) return;
@@ -156,7 +153,6 @@ export const store = {
           await api.registrarEvento(m.medicaoId, 'producao', null, ev.value);
         }
       } catch {
-        // Para no primeiro erro — tentará novamente no próximo ciclo
         break;
       }
       m.lastSyncedEventIndex = (m.lastSyncedEventIndex || 0) + 1;
@@ -167,7 +163,6 @@ export const store = {
   },
 
   // Restaura uma medição específica pelo ID com os dados passados diretamente.
-  // Usado quando o auditor escolhe manualmente qual medição retomar na tela de Medição.
   async restoreFromBackendById(medicaoId, dados) {
     try {
       const resultado = await api.medicaoAtiva(dados.maquinaLinhaId);
@@ -214,7 +209,6 @@ export const store = {
       if (dados.linhaId) this._data.config.linhaId = dados.linhaId;
 
       this.save();
-      console.log(`[store] Medição #${medicaoId} restaurada manualmente.`);
     } catch (e) {
       console.warn('[store] Erro ao restaurar medição por ID:', e);
     }
@@ -225,6 +219,7 @@ export const store = {
   // ============================================================
 
   // Inicia uma nova medição: reseta o estado, cria no backend e inicia o tracking.
+  // Passa usuario_nome do usuário logado para o backend registrar quem está medindo.
   startMeasurement(initialProduction) {
     const m = this._data.measurement;
     m.active = true;
@@ -251,6 +246,7 @@ export const store = {
       velocidade_nominal: cfg.speed,
       producao_inicial: initialProduction,
       maquina_linha_id: cfg.maquinaLinhaId,
+      usuario_nome: window.usuarioAtual?.nome || null,
     }).then(resultado => {
       if (resultado?.id) {
         this._data.measurement.medicaoId = resultado.id;
@@ -271,7 +267,6 @@ export const store = {
   },
 
   // Atualiza o motivo e categoria da última parada registrada.
-  // Se o evento tiver backendId, envia o motivo ao backend também.
   setStopReason(reason, category = null) {
     const m = this._data.measurement;
     const lastStop = [...m.events].reverse().find(e => e.type === 'stop');
@@ -292,7 +287,6 @@ export const store = {
   },
 
   // Registra evento de parada no estado local e envia ao backend imediatamente.
-  // Salva o backendId retornado para permitir atualizar o motivo depois.
   setParada() {
     const m = this._data.measurement;
     m.state = 'stopped';

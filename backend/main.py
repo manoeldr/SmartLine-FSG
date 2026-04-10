@@ -46,13 +46,13 @@ if 'maquinas_linha' in inspector.get_table_names():
             except Exception:
                 pass
 
-# Migração: maquina_linha_id em medicoes
+# Migração: usuario_nome em medicoes
 if 'medicoes' in inspector.get_table_names():
     col_names = [c['name'] for c in inspector.get_columns('medicoes')]
-    if 'maquina_linha_id' not in col_names:
+    if 'usuario_nome' not in col_names:
         with engine.connect() as conn:
             try:
-                conn.execute(text('ALTER TABLE medicoes ADD COLUMN maquina_linha_id INTEGER'))
+                conn.execute(text('ALTER TABLE medicoes ADD COLUMN usuario_nome VARCHAR'))
                 conn.commit()
             except Exception:
                 pass

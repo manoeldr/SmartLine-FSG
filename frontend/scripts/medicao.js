@@ -42,7 +42,6 @@ export function initMedicao() {
     if (notConfigured) notConfigured.classList.remove('hidden');
     if (content) content.classList.add('hidden');
     if (badge) { badge.textContent = 'Não configurado'; badge.className = 'badge'; }
-    // Mesmo sem config local, verifica se há medições ativas no backend para retomar
     verificarMedicoesNaoFinalizadas(true);
     return;
   }
@@ -56,8 +55,6 @@ export function initMedicao() {
 // TELAS
 // ============================================================
 
-// Exibe a tela de pré-início com o botão "Iniciar medição".
-// Também verifica se há medições não finalizadas para exibir o botão "Retomar".
 function showPreStartScreen() {
   document.getElementById('med-pre-start')?.classList.remove('hidden');
   document.getElementById('med-active')?.classList.add('hidden');
@@ -66,7 +63,6 @@ function showPreStartScreen() {
   const badge = document.getElementById('med-status-badge');
   if (badge) { badge.textContent = 'Aguardando'; badge.className = 'badge'; }
 
-  // Esconde o botão retomar até confirmar que há medições pendentes
   document.getElementById('btn-retomar-medicao')?.classList.add('hidden');
 
   replaceWithClone('btn-start-measurement', el => {
@@ -76,8 +72,6 @@ function showPreStartScreen() {
   verificarMedicoesNaoFinalizadas();
 }
 
-// Exibe a tela de medição ativa com botões de marcha/parada e contadores.
-// Configura todos os listeners de botões usando cloneNode para evitar duplicatas.
 function showActiveScreen() {
   document.getElementById('med-pre-start')?.classList.add('hidden');
   document.getElementById('med-active')?.classList.remove('hidden');
@@ -102,7 +96,6 @@ function showActiveScreen() {
     document.getElementById('modal-finalize')?.classList.add('hidden');
   }));
 
-  // Botão de adicionar alarme personalizado — salva no backend da máquina
   replaceWithClone('btn-add-custom-reason', el => el.addEventListener('click', async () => {
     const input = document.getElementById('custom-reason-input');
     const catSelect = document.getElementById('custom-reason-category');
@@ -128,7 +121,6 @@ function showActiveScreen() {
     if (input) input.value = '';
   }));
 
-  // Botão de finalizar pelo modal de fim de turno
   replaceWithClone('btn-end-shift', el => el.addEventListener('click', () => {
     clearShiftEndCountdown();
     store.markShiftEndPrompted();
@@ -136,7 +128,6 @@ function showActiveScreen() {
     setTimeout(() => showFinalizeModal(), 300);
   }));
 
-  // Botão de estender o turno com novo horário de fim
   replaceWithClone('btn-extend-shift', el => el.addEventListener('click', () => {
     clearShiftEndCountdown();
     const input = document.getElementById('new-shift-end-input');
@@ -148,7 +139,6 @@ function showActiveScreen() {
   }));
 }
 
-// Exibe a tela de medição finalizada com resumo de produção e botão de nova medição.
 function showFinishedScreen() {
   document.getElementById('med-pre-start')?.classList.add('hidden');
   document.getElementById('med-active')?.classList.add('hidden');
@@ -175,9 +165,6 @@ function showFinishedScreen() {
 // RETOMAR MEDIÇÃO
 // ============================================================
 
-// Verifica se há medições não finalizadas. Quando linhaId está disponível, filtra por linha;
-// caso contrário (ex: localStorage limpo), busca todas as medições sem filtro.
-// Se switchScreen=true e encontrar medições, substitui a tela "não configurado" pelo pré-início.
 async function verificarMedicoesNaoFinalizadas(switchScreen = false) {
   const linhaId = store.config.linhaId;
 
@@ -209,7 +196,6 @@ async function verificarMedicoesNaoFinalizadas(switchScreen = false) {
   } catch { /* silencioso */ }
 }
 
-// Abre o modal com a lista de medições não finalizadas para o auditor escolher qual retomar.
 function abrirModalRetomar(medicoes) {
   const modal = document.getElementById('modal-retomar-medicao');
   const list = document.getElementById('modal-retomar-list');
@@ -235,7 +221,6 @@ function abrirModalRetomar(medicoes) {
     `;
   }).join('');
 
-  // Ao selecionar uma medição, restaura o estado e vai para a tela ativa
   list.querySelectorAll('.alarm-item').forEach(el => {
     el.addEventListener('click', async () => {
       const medicaoId = parseInt(el.dataset.id);
@@ -265,8 +250,9 @@ function abrirModalRetomar(medicoes) {
 // MODAL: INICIAR MEDIÇÃO
 // ============================================================
 
-// Abre o modal de início de medição. Carrega as máquinas disponíveis da linha
-// e exibe campo para informar a produção inicial do turno.
+// Abre o modal de início de medição.
+// Mostra todas as máquinas da linha — disponíveis e ocupadas.
+// Máquinas ocupadas exibem o nome do auditor que está medindo e ficam bloqueadas.
 async function abrirModalIniciar() {
   const modal = document.getElementById('modal-iniciar-medicao');
   const list = document.getElementById('modal-maquinas-list');
@@ -278,22 +264,43 @@ async function abrirModalIniciar() {
 
   try {
     const linhaId = store.config.linhaId;
-    const maquinas = await api.listarMaquinasDisponiveis(linhaId);
+    const maquinas = await api.ocupacaoMaquinas(linhaId);
 
     if (maquinas.length === 0) {
       list.innerHTML = '';
       if (empty) empty.classList.remove('hidden');
     } else {
       if (empty) empty.classList.add('hidden');
-      list.innerHTML = maquinas.map(m => `
-        <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}" style="justify-content:flex-start;">
-          <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
-          <span>${m.nome}</span>
-          ${(!m.velocidade_nominal || m.sobrevelocidade === null || m.sobrevelocidade === undefined || m.sobrevelocidade === '') ? '<span style="margin-left:auto;font-size:0.65rem;color:var(--amber);font-weight:600;">⚠ config.</span>' : ''}
-        </div>
-      `).join('');
 
-      list.querySelectorAll('.alarm-item').forEach(el => {
+      list.innerHTML = maquinas.map(m => {
+        const semConfig = !m.velocidade_nominal || m.sobrevelocidade === null || m.sobrevelocidade === undefined;
+
+        if (m.ocupada) {
+          // Máquina ocupada — bloqueada, mostra quem está medindo
+          return `
+            <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}"
+                 style="justify-content:flex-start;opacity:0.55;cursor:not-allowed;pointer-events:none;">
+              <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
+              <span>${m.nome}</span>
+              <span style="margin-left:auto;font-size:0.7rem;color:var(--text-dim);font-weight:500;display:flex;align-items:center;gap:4px;">
+                <img src="icons/modals/lock.svg" width="12" height="12" style="filter:brightness(0);">
+                ${m.auditor || 'Em medição'}
+              </span>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}" style="justify-content:flex-start;">
+            <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
+            <span>${m.nome}</span>
+            ${semConfig ? '<span style="margin-left:auto;font-size:0.65rem;color:var(--amber);font-weight:600;">⚠ config.</span>' : ''}
+          </div>
+        `;
+      }).join('');
+
+      // Apenas máquinas disponíveis são selecionáveis
+      list.querySelectorAll('.alarm-item:not([style*="pointer-events:none"])').forEach(el => {
         el.addEventListener('click', () => {
           list.querySelectorAll('.alarm-item').forEach(e => e.classList.remove('selected'));
           el.classList.add('selected');
@@ -304,7 +311,7 @@ async function abrirModalIniciar() {
     list.innerHTML = '<p style="color:var(--red);font-size:0.875rem;text-align:center;">Erro ao carregar máquinas</p>';
   }
 
-  // Ao confirmar: valida velocidade, busca detalhes, salva no store e inicia medição
+  // Ao confirmar: valida seleção, busca detalhes e inicia medição
   replaceWithClone('btn-confirmar-inicio', el => {
     el.addEventListener('click', async () => {
       const selected = list.querySelector('.alarm-item.selected');
@@ -326,7 +333,7 @@ async function abrirModalIniciar() {
         nome: selected.dataset.nome,
       };
 
-      // Busca detalhes da máquina: velocidade, multiplicador e alarmes específicos
+      // Busca detalhes completos da máquina
       let maquinaDetalhes = null;
       try {
         const linhaId = store.config.linhaId;
@@ -338,7 +345,6 @@ async function abrirModalIniciar() {
       const sobrevel = maquinaDetalhes?.sobrevelocidade;
       const missingSobrevel = sobrevel === null || sobrevel === undefined || sobrevel === '';
 
-      // Bloqueia início se velocidade nominal ou sobrevelocidade não estiverem configuradas
       if (!rawSpeed || rawSpeed === 0 || missingSobrevel) {
         mostrarAvisoModal('A máquina precisa ter velocidade nominal e sobrevelocidade informadas para iniciar medição.');
         vibrate([100, 50, 100]);
@@ -370,8 +376,7 @@ async function abrirModalIniciar() {
   });
 }
 
-// Exibe um aviso dentro do modal de início de medição.
-// Some automaticamente após 4 segundos.
+// Exibe aviso dentro do modal de início. Some após 4 segundos.
 function mostrarAvisoModal(msg) {
   const existing = document.getElementById('modal-aviso-velocidade');
   if (existing) existing.remove();
@@ -388,7 +393,7 @@ function mostrarAvisoModal(msg) {
 // HELPERS
 // ============================================================
 
-// Substitui um elemento pelo seu clone para remover listeners antigos antes de adicionar novos.
+// Substitui um elemento pelo seu clone para remover listeners antigos.
 function replaceWithClone(id, applyListener) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -397,7 +402,7 @@ function replaceWithClone(id, applyListener) {
   applyListener(clone);
 }
 
-// Limpa o countdown de fim de turno, se existir (delegado ao main.js via window).
+// Limpa o countdown de fim de turno via main.js.
 function clearShiftEndCountdown() {
   window._clearShiftEndCountdown?.();
 }
@@ -406,7 +411,6 @@ function clearShiftEndCountdown() {
 // HANDLERS MARCHA / PARADA
 // ============================================================
 
-// Registra evento de marcha e abre o modal de motivo da parada anterior.
 function handleMarcha() {
   const m = store.measurement;
   if (m.state === 'running') return;
@@ -420,7 +424,6 @@ function handleMarcha() {
   });
 }
 
-// Registra evento de parada e atualiza o visual dos botões.
 function handleParada() {
   const m = store.measurement;
   if (m.state === 'stopped') return;
@@ -433,8 +436,6 @@ function handleParada() {
 // MODAL: MOTIVO DA PARADA
 // ============================================================
 
-// Busca os alarmes específicos da máquina ativa no backend.
-// Usa os alarmes do store como fallback se a busca falhar.
 async function getCurrentMachineAlarms() {
   const linhaId = store.config.linhaId;
   const maquinaId = store.config.maquinaLinhaId;
@@ -446,21 +447,15 @@ async function getCurrentMachineAlarms() {
       const maquina = maquinas.find(m => Number(m.id) === Number(maquinaId));
       if (maquina?.alarmes) {
         const parsed = JSON.parse(maquina.alarmes);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          alarms = parsed;
-        }
+        if (Array.isArray(parsed) && parsed.length > 0) alarms = parsed;
       }
-    } catch {
-      // ignora e usa fallback
-    }
+    } catch { /* ignora */ }
   }
 
   currentMachineAlarms = alarms;
   return alarms;
 }
 
-// Abre o modal de motivo de parada. Retorna uma Promise que resolve
-// com o motivo selecionado ou digitado pelo auditor.
 function showStopReasonModal() {
   return new Promise(async resolve => {
     const modal = document.getElementById('modal-stop-reason');
@@ -474,7 +469,6 @@ function showStopReasonModal() {
   });
 }
 
-// Renderiza a lista de alarmes no modal de motivo de parada, agrupada por categoria.
 function renderAlarmList(alarms = store.config.alarms) {
   const list = document.getElementById('alarm-list-modal');
   if (!list) return;
@@ -500,8 +494,6 @@ function renderAlarmList(alarms = store.config.alarms) {
   });
 }
 
-// Confirma o motivo de parada selecionado ou digitado.
-// Se for um alarme novo, salva na lista da máquina no backend.
 function handleConfirmReason() {
   const selected = document.querySelector('#alarm-list-modal .alarm-item.selected');
   const customInput = document.getElementById('custom-reason-input');
@@ -544,8 +536,6 @@ function handleConfirmReason() {
 // ATUALIZAÇÃO VISUAL DOS BOTÕES
 // ============================================================
 
-// Atualiza o visual dos botões de marcha/parada e o badge de status
-// de acordo com o estado atual da medição.
 function updateButtonStates() {
   const m = store.measurement;
   const marchaBtn  = document.getElementById('btn-marcha');
@@ -575,8 +565,6 @@ function updateButtonStates() {
 // TICK: ATUALIZAÇÃO A CADA SEGUNDO
 // ============================================================
 
-// Atualiza os contadores da tela ativa: timer, paradas, produção e tempo de parada atual.
-// Chamada pelo tick global do main.js a cada segundo.
 export function updateMedicao() {
   const m = store.measurement;
   if (!m.active || !m.started) return;
@@ -607,7 +595,6 @@ export function updateMedicao() {
 // FINALIZAÇÃO
 // ============================================================
 
-// Abre o modal de finalização com a última leitura de produção como placeholder.
 function showFinalizeModal() {
   const lastReading = store.getLastReading();
   const input = document.getElementById('final-production-input');
@@ -615,8 +602,6 @@ function showFinalizeModal() {
   document.getElementById('modal-finalize')?.classList.remove('hidden');
 }
 
-// Finaliza a medição: adiciona leitura final se informada, persiste no backend
-// e exibe a tela de medição finalizada.
 function handleFinalize() {
   window._clearShiftEndCountdown?.();
   const input = document.getElementById('final-production-input');
@@ -630,5 +615,4 @@ function handleFinalize() {
   showFinishedScreen();
 }
 
-// Limpa recursos da tela de medição ao navegar para outra página.
 export function cleanupMedicao() {}
