@@ -108,7 +108,7 @@ body.modal-open { overflow: hidden; }
 /* Container das páginas — centralizado com padding inferior para navbar pill */
 #page-container {
   flex: 1;
-  padding: 16px 16px calc(var(--nav-height) + 48px);
+  padding: 16px 16px calc(var(--nav-height) + 48px + env(safe-area-inset-bottom, 0px));
   max-width: 480px;
   margin: 0 auto;
   width: 100%;

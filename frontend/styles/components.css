@@ -163,15 +163,18 @@
 
 .input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: var(--bg);
   border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-size: 0.9375rem;
+  font-size: 1rem;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
   font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 44px;
 }
 
 .input:focus {

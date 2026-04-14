@@ -4,7 +4,8 @@
 // O token JWT é lido do sessionStorage e enviado em todas as requisições.
 // ============================================================
 
-const BASE_URL = 'http://127.0.0.1:5000';
+const BASE_URL = `http://${window.location.hostname}:5000`;
+// Swagger URL - http://192.168.137.1:5000/docs
 
 // Função genérica de requisição HTTP.
 // Injeta automaticamente o token JWT do sessionStorage no header Authorization.

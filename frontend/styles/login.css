@@ -2,37 +2,35 @@
    LOGIN.CSS — Tela de autenticação
    ============================================================ */
 
-/* Sobrescreve o page-container para ocupar tela toda */
+/* Remove padding do page-container na tela de login */
 #page-container:has(.page-login) {
   max-width: 100%;
   padding: 0 !important;
   margin: 0;
 }
 
-/* Tela de login — fundo degradê, layout centralizado */
+/* Tela de login — coluna flex, fundo degradê */
 .page-login {
-  position: relative;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px 16px;
+  padding: 48px 16px calc(24px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(160deg, var(--brand) 0%, var(--brand) 55%, #e8f0fe 100%);
+  gap: 0;
 }
 
-/* Logo fixada no topo como header da página */
+/* Logo acima do container — sem position absolute */
 .login-logo {
-  position: absolute;
-  top: 48px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-bottom: 24px;
 }
 
-/* Container com título + formulário — centralizado na página */
+/* Container com título + formulário */
 .login-container {
   width: 100%;
   max-width: 360px;
@@ -61,12 +59,12 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
-/* Labels — brancos */
+/* Labels brancos */
 .login-form label {
   color: rgba(255, 255, 255, 0.85) !important;
 }
 
-/* Inputs — fundo translúcido */
+/* Inputs translúcidos */
 .login-form .input {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.18);
@@ -82,7 +80,7 @@
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
 
-/* Botão entrar — branco com texto azul */
+/* Botão branco com texto azul */
 .login-form .btn-primary {
   background: #fff;
   color: var(--brand);
