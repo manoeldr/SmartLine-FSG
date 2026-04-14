@@ -201,3 +201,17 @@
 [data-theme="dark"] #cfg-usuarios-icon {
   filter: brightness(0) invert(1);
 }
+
+/* ── Drag and drop mobile ───────────────────────────────── */
+
+/* Previne seleção de texto durante arrasto no iOS */
+.maquina-item {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Desativa scroll durante toque no handle */
+.drag-handle {
+  touch-action: none;
+  -webkit-touch-callout: none;
+}

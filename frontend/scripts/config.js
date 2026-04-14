@@ -17,7 +17,6 @@ let estadoConfig = {
 let carregandoLinhas = false;
 let carregandoMaquinas = false;
 
-// Inicializa a tela de configuração com um delay para garantir que o DOM está pronto.
 export function initConfig() {
   setTimeout(() => {
     configurarSelectCliente();
@@ -37,15 +36,11 @@ export function initConfig() {
 // SEÇÃO 1 — CLIENTE
 // ============================================================
 
-// Busca todos os clientes do backend e popula o select.
-// Se houver um clienteId salvo no store, restaura a seleção e carrega as linhas.
 async function carregarClientes() {
   const select = document.getElementById('cfg-cliente-select');
   const loading = document.getElementById('cfg-cliente-loading');
-
   loading.classList.remove('hidden');
   select.disabled = true;
-
   try {
     const clientes = await api.listarClientes();
     select.innerHTML = '<option value="">Selecione um cliente...</option>';
@@ -55,7 +50,6 @@ async function carregarClientes() {
       opt.textContent = c.nome;
       select.appendChild(opt);
     });
-
     const saved = store.config.clienteId;
     if (saved) {
       select.value = saved;
@@ -70,7 +64,6 @@ async function carregarClientes() {
   }
 }
 
-// Configura o listener do select de cliente.
 function configurarSelectCliente() {
   const select = document.getElementById('cfg-cliente-select');
   if (!select || select.dataset.listenerAdded) return;
@@ -90,7 +83,6 @@ function configurarSelectCliente() {
   });
 }
 
-// Configura o botão de adicionar cliente.
 function configurarBotaoAdicionarCliente() {
   const btn = document.getElementById('cfg-cliente-add-btn');
   if (!btn) return;
@@ -123,17 +115,13 @@ function configurarBotaoAdicionarCliente() {
 // SEÇÃO 2 — LINHA
 // ============================================================
 
-// Busca as linhas do cliente selecionado e popula o select.
 async function carregarLinhas(clienteId) {
   if (carregandoLinhas) return;
   carregandoLinhas = true;
-
   const select = document.getElementById('cfg-linha-select');
   const section = document.getElementById('cfg-linha-section');
-
   section.classList.remove('hidden');
   select.innerHTML = '<option value="">Selecione uma linha...</option>';
-
   try {
     const linhas = await api.listarLinhas(clienteId);
     linhas.forEach(l => {
@@ -142,7 +130,6 @@ async function carregarLinhas(clienteId) {
       opt.textContent = l.nome;
       select.appendChild(opt);
     });
-
     const saved = store.config.linhaId;
     if (saved) {
       select.value = saved;
@@ -156,7 +143,6 @@ async function carregarLinhas(clienteId) {
   }
 }
 
-// Configura o listener do select de linha.
 function configurarSelectLinha() {
   const select = document.getElementById('cfg-linha-select');
   if (!select || select.dataset.listenerAdded) return;
@@ -169,7 +155,6 @@ function configurarSelectLinha() {
   });
 }
 
-// Configura o botão de adicionar linha.
 function configurarBotaoAdicionarLinha() {
   const btn = document.getElementById('cfg-linha-add-btn');
   if (!btn) return;
@@ -198,7 +183,6 @@ function configurarBotaoAdicionarLinha() {
   });
 }
 
-// Reseta o select de linhas e oculta a seção.
 function limparLinhas() {
   const select = document.getElementById('cfg-linha-select');
   const section = document.getElementById('cfg-linha-section');
@@ -211,14 +195,11 @@ function limparLinhas() {
 // SEÇÃO 3 — FLUXO DA LINHA (máquinas)
 // ============================================================
 
-// Busca as máquinas da linha e renderiza o fluxo.
 async function carregarMaquinas(linhaId) {
   if (carregandoMaquinas) return;
   carregandoMaquinas = true;
-
   const section = document.getElementById('cfg-maquinas-section');
   section.classList.remove('hidden');
-
   try {
     estadoConfig.maquinas = await api.listarMaquinas(linhaId);
   } catch {
@@ -226,11 +207,9 @@ async function carregarMaquinas(linhaId) {
   } finally {
     carregandoMaquinas = false;
   }
-
   renderMaquinas();
 }
 
-// Configura o botão de adicionar máquina.
 function configurarBotaoAdicionarMaquina() {
   const btn = document.getElementById('cfg-maquina-add-btn');
   if (!btn) return;
@@ -256,6 +235,7 @@ function configurarBotaoAdicionarMaquina() {
 }
 
 // Renderiza a lista de máquinas com drag-and-drop para reordenação.
+// Suporta tanto mouse (desktop) quanto touch (mobile).
 function renderMaquinas() {
   const list = document.getElementById('cfg-maquinas-list');
   if (estadoConfig.maquinas.length === 0) {
@@ -267,7 +247,7 @@ function renderMaquinas() {
     const faltaVar = (!m.velocidade_nominal || m.sobrevelocidade === null || m.sobrevelocidade === undefined || m.sobrevelocidade === '');
     return `
       <div class="maquina-item" draggable="true" data-id="${m.id}">
-        <span class="drag-handle">⠿</span>
+        <span class="drag-handle" style="touch-action:none;">⠿</span>
         <span class="maquina-ordem">${m.ordem}</span>
         <span class="maquina-nome">${m.nome}</span>
         ${m.critica ? '<span style="color:var(--brand);font-size:1rem;margin-right:4px;">★</span>' : ''}
@@ -314,44 +294,51 @@ function renderMaquinas() {
     });
   });
 
+  // ── Drag and drop com suporte a touch ───────────────────
   let dragging = null;
+  let dragClone = null;
+  let offsetY = 0;
+
+  // Salva nova ordem no backend após reordenação
+  async function salvarNovaOrdem() {
+    const items = [...list.querySelectorAll('.maquina-item')];
+    const novaOrdem = items.map((el, i) => ({
+      id: parseInt(el.dataset.id),
+      ordem: i + 1,
+    }));
+    novaOrdem.forEach(({ id, ordem }) => {
+      const m = estadoConfig.maquinas.find(m => m.id === id);
+      if (m) m.ordem = ordem;
+    });
+    estadoConfig.maquinas.sort((a, b) => a.ordem - b.ordem);
+    try {
+      await Promise.all(
+        novaOrdem.map(({ id, ordem }) =>
+          api.atualizarMaquina(estadoConfig.linhaId, id, { ordem })
+        )
+      );
+      renderMaquinas();
+      showToast('Ordem salva');
+    } catch (err) {
+      console.error('Erro ao salvar ordem:', err);
+      showToast('Erro ao salvar nova ordem', 'erro');
+    }
+  }
 
   list.querySelectorAll('.maquina-item').forEach(item => {
+    const handle = item.querySelector('.drag-handle');
+
+    // Desktop — drag nativo
     item.addEventListener('dragstart', (e) => {
       dragging = item;
       item.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
     });
 
-    item.addEventListener('dragend', async (e) => {
-      e.stopPropagation();
+    item.addEventListener('dragend', async () => {
       item.classList.remove('dragging');
       dragging = null;
-
-      const items = [...list.querySelectorAll('.maquina-item')];
-      const novaOrdem = items.map((el, i) => ({
-        id: parseInt(el.dataset.id),
-        ordem: i + 1,
-      }));
-
-      novaOrdem.forEach(({ id, ordem }) => {
-        const m = estadoConfig.maquinas.find(m => m.id === id);
-        if (m) m.ordem = ordem;
-      });
-      estadoConfig.maquinas.sort((a, b) => a.ordem - b.ordem);
-
-      try {
-        await Promise.all(
-          novaOrdem.map(({ id, ordem }) =>
-            api.atualizarMaquina(estadoConfig.linhaId, id, { ordem })
-          )
-        );
-        renderMaquinas();
-        showToast('Ordem salva');
-      } catch (err) {
-        console.error('Erro ao salvar ordem:', err);
-        showToast('Erro ao salvar nova ordem', 'erro');
-      }
+      await salvarNovaOrdem();
     });
 
     item.addEventListener('dragover', (e) => {
@@ -366,10 +353,66 @@ function renderMaquinas() {
         }
       }
     });
+
+    // Mobile — touch
+    handle.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      dragging = item;
+      item.classList.add('dragging');
+
+      // Clone visual que segue o dedo
+      dragClone = item.cloneNode(true);
+      const rect = item.getBoundingClientRect();
+      dragClone.style.cssText = `
+        position: fixed;
+        z-index: 9999;
+        width: ${rect.width}px;
+        left: ${rect.left}px;
+        opacity: 0.9;
+        pointer-events: none;
+        background: var(--bg-card);
+        border: 1.5px solid var(--brand);
+        border-radius: var(--radius-sm);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        padding: 12px 4px;
+      `;
+      const touch = e.touches[0];
+      offsetY = touch.clientY - rect.top;
+      dragClone.style.top = `${touch.clientY - offsetY}px`;
+      document.body.appendChild(dragClone);
+    }, { passive: false });
+
+    handle.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      if (!dragging || !dragClone) return;
+      const touch = e.touches[0];
+      dragClone.style.top = `${touch.clientY - offsetY}px`;
+
+      // Detecta item sob o dedo
+      dragClone.style.display = 'none';
+      const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+      dragClone.style.display = '';
+
+      const targetItem = elBelow?.closest('.maquina-item');
+      if (targetItem && targetItem !== dragging) {
+        const rect = targetItem.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (touch.clientY < mid) {
+          list.insertBefore(dragging, targetItem);
+        } else {
+          list.insertBefore(dragging, targetItem.nextSibling);
+        }
+      }
+    }, { passive: false });
+
+    handle.addEventListener('touchend', async () => {
+      if (dragClone) { dragClone.remove(); dragClone = null; }
+      if (dragging) { dragging.classList.remove('dragging'); dragging = null; }
+      await salvarNovaOrdem();
+    });
   });
 }
 
-// Limpa a lista de máquinas e oculta a seção do fluxo da linha.
 function limparMaquinas() {
   estadoConfig.maquinas = [];
   const section = document.getElementById('cfg-maquinas-section');
@@ -496,9 +539,9 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
     const sobrevelocidadeVal = sobrevelocidadeRaw !== '' ? parseFloat(sobrevelocidadeRaw) : null;
     const multiplicadorVal = parseFloat(document.getElementById('modal-maq-multiplicador').value) || 1;
 
-    if (!velocidadeVal || sobrevelocidadeVal === null || sobrevelocidadeVal === undefined || sobrevelocidadeVal === '') {
+    if (!velocidadeVal || sobrevelocidadeVal === null || sobrevelocidadeVal === undefined) {
       if (!velocidadeVal) document.getElementById('modal-maq-velocidade').style.borderColor = 'var(--red)';
-      if (sobrevelocidadeVal === null || sobrevelocidadeVal === undefined || sobrevelocidadeVal === '') {
+      if (sobrevelocidadeVal === null || sobrevelocidadeVal === undefined) {
         document.getElementById('modal-maq-sobrevelocidade').style.borderColor = 'var(--red)';
       }
       showToast('Velocidade nominal e Sobrevelocidade são obrigatórios', 'erro');
@@ -582,21 +625,17 @@ function configurarBotaoReset() {
 // GESTÃO DE USUÁRIOS — visível apenas para admin
 // ============================================================
 
-// Exibe o botão de usuários no header somente para admin e configura o listener.
 function configurarBotaoUsuarios() {
   const btn = document.getElementById('cfg-usuarios-btn');
   if (!btn) return;
-
   const usuario = window.usuarioAtual;
   if (usuario?.nivel === 'admin') {
     btn.classList.remove('hidden');
     btn.style.display = 'flex';
   }
-
   btn.addEventListener('click', abrirModalUsuarios);
 }
 
-// Abre o modal de gestão de usuários com lista e formulário de criação.
 async function abrirModalUsuarios() {
   document.getElementById('modal-usuarios')?.remove();
 
@@ -607,9 +646,7 @@ async function abrirModalUsuarios() {
     <div class="modal">
       <h3>Gestão de usuários</h3>
       <p class="modal-sub">Cadastre e gerencie os acessos ao SmartLine</p>
-
       <div id="modal-usuarios-list" style="margin-bottom:20px;"></div>
-
       <p style="font-size:0.875rem;font-weight:600;color:var(--text);margin-bottom:12px;">Novo usuário</p>
       <div class="form-row">
         <div class="form-group flex-1">
@@ -638,14 +675,12 @@ async function abrirModalUsuarios() {
           <option value="admin">Admin</option>
         </select>
       </div>
-
       <button type="button" class="btn btn-primary btn-block" id="btn-criar-usuario">Criar usuário</button>
       <button type="button" class="btn btn-outline btn-block" id="btn-fechar-usuarios" style="margin-top:8px;">Fechar</button>
     </div>
   `;
   document.body.appendChild(modal);
 
-  // Gera login automaticamente ao digitar nome ou sobrenome
   const nomeInput = document.getElementById('novo-usuario-nome');
   const sobrenomeInput = document.getElementById('novo-usuario-sobrenome');
   const loginInput = document.getElementById('novo-usuario-login');
@@ -659,11 +694,9 @@ async function abrirModalUsuarios() {
   nomeInput.addEventListener('input', atualizarLogin);
   sobrenomeInput.addEventListener('input', atualizarLogin);
 
-  // Fecha ao clicar no overlay ou no botão fechar
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   document.getElementById('btn-fechar-usuarios').addEventListener('click', () => modal.remove());
 
-  // Cria novo usuário
   document.getElementById('btn-criar-usuario').addEventListener('click', async () => {
     const nome = nomeInput.value.trim();
     const sobrenome = sobrenomeInput.value.trim();
@@ -690,11 +723,9 @@ async function abrirModalUsuarios() {
   await renderListaUsuarios();
 }
 
-// Renderiza a lista de usuários com opções de deletar e redefinir senha.
 async function renderListaUsuarios() {
   const list = document.getElementById('modal-usuarios-list');
   if (!list) return;
-
   try {
     const usuarios = await api.listarUsuarios();
     const usuarioAtual = window.usuarioAtual;
@@ -719,7 +750,6 @@ async function renderListaUsuarios() {
       </div>
     `).join('');
 
-    // Deletar usuário
     list.querySelectorAll('.btn-deletar-usuario').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm('Remover este usuário?')) return;
@@ -733,7 +763,6 @@ async function renderListaUsuarios() {
       });
     });
 
-    // Redefinir senha
     list.querySelectorAll('.btn-reset-senha').forEach(btn => {
       btn.addEventListener('click', async () => {
         const nova = prompt('Nova senha (mínimo 6 caracteres):');
@@ -746,7 +775,6 @@ async function renderListaUsuarios() {
         }
       });
     });
-
   } catch {
     list.innerHTML = '<p style="font-size:0.8rem;color:var(--red);">Erro ao carregar usuários</p>';
   }
