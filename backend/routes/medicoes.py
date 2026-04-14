@@ -6,6 +6,7 @@ from backend.database import get_db
 from backend.models.medicao import Medicao
 from backend.models.evento import Evento
 from backend.schemas.medicao import MedicaoCreate, MedicaoUpdate, MedicaoResponse
+from backend.calculations import calcular_indicadores, calcular_paradas_por_motivo
 
 from datetime import datetime
 
@@ -69,9 +70,7 @@ def listar_medicoes(
     return query.order_by(Medicao.timestamp_inicio.desc()).all()
 
 
-# Retorna os valores disponíveis para os filtros do overview:
-# lista de clientes, turnos e datas com medições registradas na linha.
-# Faz fallback para todas as medições se nenhuma estiver vinculada à linha.
+# Retorna os valores disponíveis para os filtros do overview.
 @router.get("/filtros-disponiveis")
 def filtros_disponiveis(linha_id: int, db: Session = Depends(get_db)):
     from backend.models.maquina_linha import MaquinaLinha
@@ -98,8 +97,6 @@ def filtros_disponiveis(linha_id: int, db: Session = Depends(get_db)):
 
 
 # Retorna a medição ativa de uma máquina específica, junto com todos os seus eventos.
-# Usado pelo frontend para recuperar o estado da medição após reinicialização do dispositivo.
-# Retorna null se não houver medição ativa para a máquina.
 @router.get("/ativa")
 def medicao_ativa(maquina_linha_id: int, db: Session = Depends(get_db)):
     medicao = db.query(Medicao).filter(
@@ -125,6 +122,7 @@ def medicao_ativa(maquina_linha_id: int, db: Session = Depends(get_db)):
         },
         "eventos": [
             {
+                "id": e.id,
                 "tipo": e.tipo,
                 "timestamp": e.timestamp.isoformat(),
                 "motivo": e.motivo,
@@ -135,8 +133,40 @@ def medicao_ativa(maquina_linha_id: int, db: Session = Depends(get_db)):
     }
 
 
+# Retorna todos os indicadores calculados de uma medição específica.
+# OEE, MTBF, MTTR, disponibilidade, performance, produção e paradas por motivo.
+# Centraliza os cálculos no backend — o frontend só exibe os resultados.
+@router.get("/{medicao_id}/indicadores")
+def indicadores_medicao(medicao_id: int, db: Session = Depends(get_db)):
+    medicao = db.query(Medicao).filter(Medicao.id == medicao_id).first()
+    if not medicao:
+        raise HTTPException(status_code=404, detail="Medição não encontrada")
+
+    eventos = db.query(Evento).filter(
+        Evento.medicao_id == medicao_id
+    ).order_by(Evento.timestamp).all()
+
+    indicadores = calcular_indicadores(
+        eventos=eventos,
+        timestamp_inicio=medicao.timestamp_inicio,
+        timestamp_fim=medicao.timestamp_fim,
+        producao_inicial=medicao.producao_inicial or 0,
+        velocidade_nominal=medicao.velocidade_nominal or 1,
+    )
+
+    paradas = calcular_paradas_por_motivo(
+        eventos=eventos,
+        timestamp_fim=medicao.timestamp_fim,
+    )
+
+    return {
+        **indicadores,
+        "medicao_id": medicao_id,
+        "paradas_por_motivo": paradas,
+    }
+
+
 # Retorna uma medição específica pelo ID, incluindo seus eventos.
-# Retorna 404 se não encontrada.
 @router.get("/{medicao_id}", response_model=MedicaoResponse)
 def buscar_medicao(medicao_id: int, db: Session = Depends(get_db)):
     medicao = db.query(Medicao).options(selectinload(Medicao.eventos)).filter(Medicao.id == medicao_id).first()
@@ -146,8 +176,6 @@ def buscar_medicao(medicao_id: int, db: Session = Depends(get_db)):
 
 
 # Finaliza uma medição informando a produção final.
-# Define o timestamp_fim como agora se não for fornecido.
-# Retorna 400 se a medição já estiver finalizada.
 @router.patch("/{medicao_id}/finalizar", response_model=MedicaoResponse)
 def finalizar_medicao(medicao_id: int, dados: MedicaoUpdate, db: Session = Depends(get_db)):
     medicao = db.query(Medicao).filter(Medicao.id == medicao_id).first()
@@ -161,3 +189,22 @@ def finalizar_medicao(medicao_id: int, dados: MedicaoUpdate, db: Session = Depen
     db.commit()
     db.refresh(medicao)
     return medicao
+
+
+# Atualiza o motivo de um evento de parada específico.
+@router.patch("/{medicao_id}/eventos/{evento_id}/motivo")
+def atualizar_motivo_evento(
+    medicao_id: int,
+    evento_id: int,
+    motivo: str,
+    db: Session = Depends(get_db)
+):
+    evento = db.query(Evento).filter(
+        Evento.id == evento_id,
+        Evento.medicao_id == medicao_id
+    ).first()
+    if not evento:
+        raise HTTPException(status_code=404, detail="Evento não encontrado")
+    evento.motivo = motivo
+    db.commit()
+    return {"ok": True}

@@ -2,6 +2,7 @@
 // OVERVIEW.JS — Tela de visão geral da linha de produção
 // Mostra fluxo da linha, KPIs da máquina crítica e modal
 // de detalhes por máquina. Suporta dados em tempo real e histórico.
+// Cálculos de indicadores delegados ao backend (calculations.py).
 // ============================================================
 
 import { store } from './store.js';
@@ -18,7 +19,7 @@ let lastFluxoUpdateTime = 0;
 
 const FLUXO_UPDATE_INTERVAL_MS = 30_000;
 
-// Inicializa a tela de overview. Carrega dados em tempo real ou histórico.
+// Inicializa a tela de overview.
 export async function initOverview() {
   productionChart = null;
   modalPieChart = null;
@@ -49,10 +50,8 @@ export async function updateOverview() {
 // CLOCK
 // ============================================================
 
-// Inicia o relógio no header.
 function iniciarClock() { atualizarClock(); }
 
-// Atualiza o horário exibido no header.
 function atualizarClock() {
   const el = document.getElementById('ov-clock');
   if (el) el.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -62,7 +61,6 @@ function atualizarClock() {
 // FILTROS
 // ============================================================
 
-// Popula os selects de filtro com dados reais do backend.
 async function inicializarFiltros() {
   const linhaId = store.config.linhaId;
   if (!linhaId) return;
@@ -107,7 +105,6 @@ async function inicializarFiltros() {
   } catch { /* silencioso */ }
 }
 
-// Configura os listeners dos botões de filtro.
 function configurarFiltroUI() {
   const filterBtn = document.getElementById('ov-filter-btn');
   const filterPanel = document.getElementById('ov-filter-panel');
@@ -147,7 +144,8 @@ function configurarFiltroUI() {
 // DADOS DA MÁQUINA CRÍTICA
 // ============================================================
 
-// Busca e exibe os dados da máquina crítica (tempo real ou filtrado).
+// Busca e exibe os dados da máquina crítica.
+// Indicadores calculados pelo backend via /medicoes/{id}/indicadores.
 async function carregarDadosCritica() {
   const linhaId = store.config.linhaId;
   if (!linhaId) {
@@ -191,7 +189,9 @@ async function carregarDadosCritica() {
       });
 
       if (medicoes.length > 0) {
-        calcularEExibirIndicadores(medicoes[0], critica);
+        // Busca indicadores calculados pelo backend
+        const indicadores = await api.indicadoresMedicao(medicoes[0].id);
+        exibirIndicadores(indicadores);
         renderBarChart(medicoes[0]);
       }
     } else {
@@ -202,41 +202,16 @@ async function carregarDadosCritica() {
   }
 }
 
-// Calcula e exibe MTBF, MTTR, disponibilidade, performance e OEE a partir da medição.
-function calcularEExibirIndicadores(medicao, critica) {
-  const eventos = medicao.eventos || [];
-  const startTime = new Date(medicao.timestamp_inicio);
-  const endTime = medicao.timestamp_fim ? new Date(medicao.timestamp_fim) : new Date();
-  const elapsed = endTime - startTime;
-
-  let stoppedMs = 0, stopTime = null, numParadas = 0;
-  for (const ev of eventos) {
-    if (ev.tipo === 'parada') { stopTime = new Date(ev.timestamp); numParadas++; }
-    else if (ev.tipo === 'marcha' && stopTime) { stoppedMs += new Date(ev.timestamp) - stopTime; stopTime = null; }
-  }
-  if (stopTime) stoppedMs += endTime - stopTime;
-
-  const runningMs = Math.max(0, elapsed - stoppedMs);
-  const availability = elapsed > 0 ? (runningMs / elapsed) * 100 : 0;
-  const prodReadings = eventos.filter(e => e.tipo === 'producao' && e.producao_leitura !== null);
-  const lastProd = prodReadings.length > 0 ? prodReadings[prodReadings.length - 1].producao_leitura : medicao.producao_inicial;
-  const oeeProd = lastProd - medicao.producao_inicial;
-  const runningHours = runningMs / 3600000;
-  const expectedOutput = runningHours * (medicao.velocidade_nominal || critica?.velocidade || 1);
-  const performance = expectedOutput > 0 ? Math.min((oeeProd / expectedOutput) * 100, 100) : 0;
-  const oee = (availability / 100) * (performance / 100) * 100;
-  const mtbf = numParadas > 0 ? runningMs / numParadas : null;
-  const mttr = numParadas > 0 ? stoppedMs / numParadas : null;
-
-  document.getElementById('ov-total-stops').textContent = numParadas;
-  document.getElementById('ov-mtbf').textContent = mtbf ? formatTimeMM(mtbf) : '—';
-  document.getElementById('ov-mttr').textContent = mttr ? formatTimeMM(mttr) : '—';
-  document.getElementById('ov-availability').textContent = formatPercent(availability);
-  document.getElementById('ov-performance').textContent = formatPercent(performance);
-  document.getElementById('ov-oee').textContent = formatPercent(oee);
+// Exibe os indicadores retornados pelo backend no painel do overview.
+function exibirIndicadores(ind) {
+  document.getElementById('ov-total-stops').textContent = ind.num_paradas ?? '—';
+  document.getElementById('ov-mtbf').textContent = ind.mtbf_ms ? formatTimeMM(ind.mtbf_ms) : '—';
+  document.getElementById('ov-mttr').textContent = ind.mttr_ms ? formatTimeMM(ind.mttr_ms) : '—';
+  document.getElementById('ov-availability').textContent = formatPercent(ind.disponibilidade ?? 0);
+  document.getElementById('ov-performance').textContent = formatPercent(ind.performance ?? 0);
+  document.getElementById('ov-oee').textContent = formatPercent(ind.oee ?? 0);
 }
 
-// Limpa os KPIs quando não há máquina crítica definida.
 function limparKPIs() {
   ['ov-vel-nominal', 'ov-production', 'ov-efficiency', 'ov-total-stops'].forEach(id => {
     const el = document.getElementById(id); if (el) el.textContent = '—';
@@ -244,7 +219,6 @@ function limparKPIs() {
   limparIndicadores();
 }
 
-// Limpa os indicadores calculados.
 function limparIndicadores() {
   ['ov-mtbf', 'ov-mttr', 'ov-availability', 'ov-performance', 'ov-oee'].forEach(id => {
     const el = document.getElementById(id); if (el) el.textContent = '—';
@@ -255,7 +229,6 @@ function limparIndicadores() {
 // GRÁFICO DE BARRAS — PRODUÇÃO TEMPO REAL
 // ============================================================
 
-// Renderiza o gráfico de barras de produção real vs nominal da máquina crítica.
 function renderBarChart(medicao) {
   const canvas = document.getElementById('ov-production-chart');
   const emptyEl = document.getElementById('ov-chart-empty');
@@ -346,7 +319,6 @@ function renderBarChart(medicao) {
 // FLUXO DA LINHA
 // ============================================================
 
-// Renderiza o fluxo visual da linha. Cada máquina é clicável e abre o modal de detalhes.
 async function renderFluxoLinha() {
   const container = document.getElementById('ov-fluxo-linha');
   if (!container) return;
@@ -408,11 +380,11 @@ async function renderFluxoLinha() {
 // ============================================================
 
 // Abre o modal bottom sheet com os detalhes completos de uma máquina.
+// Indicadores OEE, MTBF, MTTR e paradas calculados pelo backend.
 async function abrirModalMaquina(maquina) {
   const modal = document.getElementById('modal-maquina-detalhes');
   if (!modal) return;
 
-  // Header
   const dot = document.getElementById('modal-maq-dot');
   if (dot) dot.className = `status-dot-inline ${maquina.estado}`;
   document.getElementById('modal-maq-nome').textContent = maquina.maquina_nome;
@@ -420,14 +392,14 @@ async function abrirModalMaquina(maquina) {
   const statusLabels = { rodando: 'Rodando', parado: 'Parada', sem_informacao: 'Sem informação', ultima_medicao: 'Última medição' };
   document.getElementById('modal-maq-sub').textContent = statusLabels[maquina.estado] || '—';
 
-  // KPIs básicos do status
+  // KPIs básicos do status (já calculados pelo backend no statusLinha)
   document.getElementById('modal-maq-producao').textContent = maquina.producao !== null && maquina.producao !== undefined
     ? maquina.producao.toLocaleString('pt-BR') : '0';
   document.getElementById('modal-maq-eficiencia').textContent = maquina.eficiencia !== null ? `${maquina.eficiencia}%` : '0%';
   document.getElementById('modal-maq-tempo-parado').textContent = maquina.tempo_parado_ms ? formatTimeMM(maquina.tempo_parado_ms) : '00:00';
   document.getElementById('modal-maq-mtbf').textContent = maquina.mtbf_ms ? formatTimeMM(maquina.mtbf_ms) : '00:00';
   document.getElementById('modal-maq-mttr').textContent = maquina.mttr_ms ? formatTimeMM(maquina.mttr_ms) : '00:00';
-  document.getElementById('modal-maq-oee').textContent = '0%';
+  document.getElementById('modal-maq-oee').textContent = '—';
 
   // Limpa conteúdo anterior
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
@@ -442,7 +414,6 @@ async function abrirModalMaquina(maquina) {
   document.getElementById('modal-maq-no-stops')?.classList.remove('hidden');
   document.getElementById('modal-donut-inner')?.classList.add('hidden');
 
-  // Fecha ao clicar no overlay
   modal.onclick = (e) => { if (e.target === modal) fecharModal(); };
 
   const btnFechar = document.getElementById('modal-maq-fechar');
@@ -453,7 +424,6 @@ async function abrirModalMaquina(maquina) {
   modal.classList.remove('hidden');
   document.body.classList.add('modal-open');
 
-  // Busca medição da máquina para enriquecer com dados calculados
   try {
     const medicoes = await api.listarMedicoes({
       linhaId: store.config.linhaId,
@@ -462,47 +432,31 @@ async function abrirModalMaquina(maquina) {
 
     if (medicoes.length > 0) {
       const medicao = medicoes[0];
-      const eventos = medicao.eventos || [];
-      const startTime = new Date(medicao.timestamp_inicio);
-      const endTime = medicao.timestamp_fim ? new Date(medicao.timestamp_fim) : new Date();
-      const elapsed = endTime - startTime;
 
-      // Calcula OEE
-      let stoppedMs = 0, stopTime = null, numParadas = 0;
-      for (const ev of eventos) {
-        if (ev.tipo === 'parada') { stopTime = new Date(ev.timestamp); numParadas++; }
-        else if (ev.tipo === 'marcha' && stopTime) { stoppedMs += new Date(ev.timestamp) - stopTime; stopTime = null; }
-      }
-      if (stopTime) stoppedMs += endTime - stopTime;
+      // Busca indicadores calculados pelo backend — fonte única de verdade
+      const ind = await api.indicadoresMedicao(medicao.id);
 
-      const runningMs = Math.max(0, elapsed - stoppedMs);
-      const availability = elapsed > 0 ? (runningMs / elapsed) * 100 : 0;
-      const prodReadings = eventos.filter(e => e.tipo === 'producao' && e.producao_leitura !== null);
-      const lastProd = prodReadings.length > 0 ? prodReadings[prodReadings.length - 1].producao_leitura : medicao.producao_inicial;
-      const oeeProd = lastProd - medicao.producao_inicial;
-      const runningHours = runningMs / 3600000;
-      const expectedOutput = runningHours * (medicao.velocidade_nominal || 1);
-      const performance = expectedOutput > 0 ? Math.min((oeeProd / expectedOutput) * 100, 100) : 0;
-      const oee = (availability / 100) * (performance / 100) * 100;
-      document.getElementById('modal-maq-oee').textContent = formatPercent(oee);
+      document.getElementById('modal-maq-oee').textContent = formatPercent(ind.oee ?? 0);
 
-      renderModalDonut(eventos, endTime, stoppedMs);
-      renderModalEventos(eventos, startTime);
+      // Donut de paradas usando dados já calculados pelo backend
+      renderModalDonutFromIndicadores(ind, medicao);
+
+      // Timeline de eventos (ainda usa os eventos da medição para exibir detalhes)
+      renderModalEventos(medicao.eventos || [], new Date(medicao.timestamp_inicio));
     }
   } catch (e) {
     console.warn('[modal] Erro ao carregar detalhes:', e);
   }
 }
 
-// Fecha o modal de detalhes da máquina.
 function fecharModal() {
   document.getElementById('modal-maquina-detalhes')?.classList.add('hidden');
   document.body.classList.remove('modal-open');
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
 }
 
-// Renderiza o gráfico donut de paradas por motivo com tempo total no centro.
-function renderModalDonut(eventos, endTime, totalStoppedMs) {
+// Renderiza o donut de paradas usando os dados calculados pelo backend.
+function renderModalDonutFromIndicadores(ind, medicao) {
   const canvas = document.getElementById('modal-maq-pie');
   const legend = document.getElementById('modal-maq-pie-legend');
   const noStops = document.getElementById('modal-maq-no-stops');
@@ -511,24 +465,9 @@ function renderModalDonut(eventos, endTime, totalStoppedMs) {
 
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
 
-  // Agrupa paradas por motivo com duração
-  const byMotivo = {};
-  for (let i = 0; i < eventos.length; i++) {
-    if (eventos[i].tipo === 'parada') {
-      const motivo = eventos[i].motivo || 'Não informado';
-      const next = eventos.find((e, j) => j > i && e.tipo === 'marcha');
-      const start = new Date(eventos[i].timestamp);
-      const end = next ? new Date(next.timestamp) : endTime;
-      const durationMs = end - start;
-      if (!byMotivo[motivo]) byMotivo[motivo] = { count: 0, totalMs: 0 };
-      byMotivo[motivo].count++;
-      byMotivo[motivo].totalMs += durationMs;
-    }
-  }
+  const paradas = ind.paradas_por_motivo || [];
 
-  const entries = Object.entries(byMotivo);
-
-  if (entries.length === 0) {
+  if (paradas.length === 0) {
     inner?.classList.add('hidden');
     noStops?.classList.remove('hidden');
     return;
@@ -537,17 +476,16 @@ function renderModalDonut(eventos, endTime, totalStoppedMs) {
   inner?.classList.remove('hidden');
   noStops?.classList.add('hidden');
 
-  const total = entries.reduce((s, [, v]) => s + v.totalMs, 0);
-
-  document.getElementById('modal-donut-time').textContent = formatTimeMM(totalStoppedMs);
-  document.getElementById('modal-donut-pct').textContent = `${entries.reduce((s, [, v]) => s + v.count, 0)} paradas`;
+  // Tempo total parado no centro do donut
+  document.getElementById('modal-donut-time').textContent = formatTimeMM(ind.stopped_ms ?? 0);
+  document.getElementById('modal-donut-pct').textContent = `${ind.num_paradas} paradas`;
 
   modalPieChart = new Chart(canvas, {
     type: 'doughnut',
     data: {
-      labels: entries.map(([k]) => k),
+      labels: paradas.map(p => p.motivo),
       datasets: [{
-        data: entries.map(([, v]) => v.totalMs),
+        data: paradas.map(p => p.total_ms),
         backgroundColor: PIE_COLORS,
         borderWidth: 0,
         hoverOffset: 4,
@@ -563,8 +501,7 @@ function renderModalDonut(eventos, endTime, totalStoppedMs) {
           callbacks: {
             label: ctx => {
               const mins = Math.floor(ctx.parsed / 60000);
-              const pct = Math.round((ctx.parsed / total) * 100);
-              return `${ctx.label}: ${mins}min (${pct}%)`;
+              return `${ctx.label}: ${mins}min (${paradas[ctx.dataIndex].percentual}%)`;
             }
           }
         }
@@ -572,31 +509,28 @@ function renderModalDonut(eventos, endTime, totalStoppedMs) {
     }
   });
 
-  legend.innerHTML = entries.map(([motivo, data], i) => {
-    const pct = Math.round((data.totalMs / total) * 100);
-    const mins = Math.floor(data.totalMs / 60000);
-    const secs = Math.floor((data.totalMs % 60000) / 1000);
+  legend.innerHTML = paradas.map((p, i) => {
+    const mins = Math.floor(p.total_ms / 60000);
+    const secs = Math.floor((p.total_ms % 60000) / 1000);
     const tempoStr = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
     return `
       <div class="modal-donut-legend-item">
         <div class="modal-donut-legend-row">
           <span class="modal-donut-dot" style="background:${PIE_COLORS[i % PIE_COLORS.length]}"></span>
-          <span class="modal-donut-legend-nome">${motivo}</span>
+          <span class="modal-donut-legend-nome">${p.motivo}</span>
         </div>
-        <span class="modal-donut-legend-detalhe">${tempoStr} · ${pct}%</span>
+        <span class="modal-donut-legend-detalhe">${tempoStr} · ${p.percentual}%</span>
       </div>
     `;
   }).join('');
 }
 
 // Renderiza a timeline de eventos recentes no modal.
-// Mostra horário, ícone, motivo e duração de cada evento à direita.
 function renderModalEventos(eventos, startTime) {
   const container = document.getElementById('modal-maq-eventos');
   const noEventos = document.getElementById('modal-maq-no-eventos');
   if (!container) return;
 
-  // Filtra e ordena eventos relevantes (últimos 10, mais recentes primeiro)
   const relevantes = [...eventos]
     .filter(e => ['parada', 'marcha', 'producao'].includes(e.tipo))
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
@@ -610,7 +544,6 @@ function renderModalEventos(eventos, startTime) {
 
   noEventos?.classList.add('hidden');
 
-  // Lista completa em ordem cronológica para calcular durações
   const todosCronologicos = [...eventos]
     .filter(e => ['parada', 'marcha', 'producao'].includes(e.tipo))
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -635,7 +568,6 @@ function renderModalEventos(eventos, startTime) {
     if (ev.tipo === 'marcha') motivo = 'Retomada';
     if (ev.tipo === 'producao') motivo = `${ev.producao_leitura?.toLocaleString('pt-BR') || '—'} un`;
 
-    // Calcula duração — tempo até o próximo evento (ou agora se for o último)
     let duracao = '';
     const idxCron = todosCronologicos.findIndex(e => e.timestamp === ev.timestamp && e.tipo === ev.tipo);
     if (idxCron !== -1) {
