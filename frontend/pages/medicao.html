@@ -1,7 +1,7 @@
 <div class="page page-medicao">
   <header class="page-header">
     <h1>Medição</h1>
-    <span class="badge" id="med-status-badge">Aguardando</span>
+    <span class="badge" id="med-status-badge" style="margin-right:88px;">Aguardando</span>
   </header>
 
   <div id="med-not-configured" class="empty-state">
@@ -80,12 +80,11 @@
 
   </div>
 
-  <!-- MODAL: INICIAR MEDIÇÃO (selecionar máquina + produção inicial) -->
+  <!-- MODAL: INICIAR MEDIÇÃO -->
   <div class="modal-overlay hidden" id="modal-iniciar-medicao">
     <div class="modal">
       <h3>Iniciar medição</h3>
       <p class="modal-sub">Selecione sua máquina e informe a produção inicial</p>
-
       <div style="margin-bottom: 16px;">
         <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Máquina</label>
         <div id="modal-maquinas-list" class="alarm-list"></div>
@@ -93,12 +92,10 @@
           Nenhuma máquina disponível no momento
         </p>
       </div>
-
       <div style="margin-bottom: 16px;">
         <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Produção do dia até agora</label>
         <input type="number" id="initial-production-input" placeholder="Ex: 24500" class="input input-lg" inputmode="numeric">
       </div>
-
       <button type="button" class="btn btn-primary btn-block" id="btn-confirmar-inicio">Iniciar</button>
       <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-inicio" style="margin-top:8px;">Cancelar</button>
     </div>

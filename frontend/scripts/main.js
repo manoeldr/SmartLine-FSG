@@ -17,6 +17,7 @@ const container = document.getElementById('page-container');
 const navButtons = document.querySelectorAll('.nav-btn');
 const navbar = document.getElementById('navbar');
 const btnThemeToggle = document.getElementById('btn-theme-toggle');
+const btnLogout = document.getElementById('btn-logout');
 let currentPage = null;
 
 // Usuário autenticado — carregado do sessionStorage
@@ -34,12 +35,10 @@ async function iniciarApp() {
 
   if (token && usuarioSalvo) {
     try {
-      // Valida o token com o backend
       const usuario = await api.me();
       usuarioAtual = usuario;
       entrarNoApp(usuario);
     } catch {
-      // Token inválido (servidor reiniciou) — vai para login
       sessionStorage.removeItem('smartline_token');
       sessionStorage.removeItem('smartline_usuario');
       mostrarLogin();
@@ -49,10 +48,11 @@ async function iniciarApp() {
   }
 }
 
-// Exibe a tela de login e esconde a navbar e botão de tema.
+// Exibe a tela de login e esconde navbar, tema e logout.
 function mostrarLogin() {
   navbar?.classList.add('hidden');
   if (btnThemeToggle) btnThemeToggle.style.display = 'none';
+  if (btnLogout) btnLogout.style.display = 'none';
   loadPageLogin();
 }
 
@@ -74,15 +74,19 @@ async function loadPageLogin() {
 }
 
 // Entra no app após login bem sucedido.
-// Exibe navbar, botão de tema e redireciona conforme o nível do usuário.
+// Exibe navbar, tema, logout e redireciona conforme o nível do usuário.
 function entrarNoApp(usuario) {
   navbar?.classList.remove('hidden');
   if (btnThemeToggle) btnThemeToggle.style.display = '';
 
-  // Filtra botões da navbar conforme o nível
+  // Exibe e configura o botão de logout
+  if (btnLogout) {
+    btnLogout.style.display = 'flex';
+    btnLogout.onclick = () => abrirModalLogout();
+  }
+
   aplicarPermissoesNavbar(usuario.nivel);
 
-  // Redireciona para a tela inicial conforme o nível
   const paginaInicial = {
     admin: 'overview',
     auditor: 'overview',
@@ -93,7 +97,6 @@ function entrarNoApp(usuario) {
 }
 
 // Mostra/oculta botões da navbar conforme o nível do usuário.
-// Admin: todas as telas | Auditor: Medição + Overview | Cliente: só Overview
 function aplicarPermissoesNavbar(nivel) {
   navButtons.forEach(btn => {
     const page = btn.dataset.page;
@@ -102,9 +105,35 @@ function aplicarPermissoesNavbar(nivel) {
     } else if (nivel === 'auditor') {
       btn.style.display = page === 'config' ? 'none' : '';
     } else {
-      btn.style.display = ''; // admin vê tudo
+      btn.style.display = '';
     }
   });
+}
+
+// Abre o modal de confirmação de logout.
+function abrirModalLogout() {
+  const existing = document.getElementById('modal-logout');
+  if (existing) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-logout';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal" style="text-align:center;">
+      <h3>Sair do sistema</h3>
+      <p class="modal-sub">Tem certeza que deseja sair?</p>
+      <button class="btn btn-danger btn-block" id="btn-confirmar-logout">Sair</button>
+      <button class="btn btn-outline btn-block" id="btn-cancelar-logout" style="margin-top:8px;">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  document.getElementById('btn-confirmar-logout').addEventListener('click', () => {
+    modal.remove();
+    logout();
+  });
+  document.getElementById('btn-cancelar-logout').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
 }
 
 // Realiza o logout — limpa sessão e volta para login.
@@ -115,6 +144,7 @@ function logout() {
   store.resetMeasurement();
   document.getElementById('modal-usuarios')?.remove();
   document.getElementById('modal-config-maquina')?.remove();
+  document.getElementById('modal-logout')?.remove();
   mostrarLogin();
 }
 
@@ -133,8 +163,6 @@ Object.defineProperty(window, 'usuarioAtual', {
 // NAVEGAÇÃO
 // ============================================================
 
-// Carrega uma página dinamicamente via fetch do HTML
-// e inicializa o módulo JS correspondente.
 async function loadPage(name) {
   if (currentPage === name) return;
   if (currentPage === 'medicao') cleanupMedicao();
@@ -164,7 +192,6 @@ async function loadPage(name) {
 // Configura os botões da navbar para navegar entre páginas.
 navButtons.forEach(btn => {
   btn.addEventListener('click', () => {
-    // Verifica permissão antes de navegar
     const page = btn.dataset.page;
     const nivel = usuarioAtual?.nivel;
     if (nivel === 'cliente' && page !== 'overview') return;
@@ -181,7 +208,6 @@ let shiftEndCountdownInterval = null;
 let shiftEndAutoFinalizeTimeout = null;
 const SHIFT_END_AUTO_FINALIZE_MS = 5 * 60 * 1000;
 
-// Limpa o countdown do fim de turno e cancela o timeout de auto-finalização.
 function clearShiftEndCountdown() {
   if (shiftEndCountdownInterval) { clearInterval(shiftEndCountdownInterval); shiftEndCountdownInterval = null; }
   if (shiftEndAutoFinalizeTimeout) { clearTimeout(shiftEndAutoFinalizeTimeout); shiftEndAutoFinalizeTimeout = null; }
@@ -189,7 +215,6 @@ function clearShiftEndCountdown() {
   if (el) el.textContent = '';
 }
 
-// Inicia o countdown regressivo de 5 minutos com auto-finalização.
 function startShiftEndCountdown() {
   clearShiftEndCountdown();
   const countdownEl = document.getElementById('shift-end-countdown');
@@ -215,7 +240,6 @@ function startShiftEndCountdown() {
 
 window._clearShiftEndCountdown = clearShiftEndCountdown;
 
-// Inicializa os listeners dos modais globais de produção e fim de turno.
 function initGlobalModals() {
   document.getElementById('btn-confirm-production')?.addEventListener('click', () => {
     const input = document.getElementById('production-input');
@@ -255,7 +279,6 @@ function initGlobalModals() {
 // TOGGLE DE TEMA GLOBAL
 // ============================================================
 
-// Atualiza o ícone do botão de tema conforme o tema atual.
 function atualizarIconeTema() {
   const isDark = store.getTheme() === 'dark';
   const iconSun = document.getElementById('icon-sun');
@@ -264,7 +287,6 @@ function atualizarIconeTema() {
   if (iconMoon) iconMoon.style.display = isDark ? 'none' : 'block';
 }
 
-// Inicializa o botão de tema global.
 function initThemeToggle() {
   const btn = document.getElementById('btn-theme-toggle');
   if (!btn) return;
@@ -280,7 +302,6 @@ function initThemeToggle() {
 // TICK GLOBAL
 // ============================================================
 
-// Roda a cada 1 segundo para atualizar timers e verificar condições periódicas.
 setInterval(() => {
   if (currentPage === 'overview') updateOverview();
   if (currentPage === 'medicao')  updateMedicao();
@@ -314,9 +335,10 @@ store.applyTheme();
 initGlobalModals();
 initThemeToggle();
 
-// Oculta navbar e botão de tema até autenticar
+// Oculta navbar, tema e logout até autenticar
 navbar?.classList.add('hidden');
 if (btnThemeToggle) btnThemeToggle.style.display = 'none';
+if (btnLogout) btnLogout.style.display = 'none';
 
 // Verifica sessão e inicia o app
 iniciarApp();

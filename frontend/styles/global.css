@@ -3,13 +3,13 @@
    Componentes que persistem em todas as telas (fora do page-container)
    ============================================================ */
 
-/* ── Botão de alternância de tema ───────────────────────── */
+/* ── Botões globais do header ───────────────────────────── */
 
-/* Fixado no canto superior direito, sobre todas as páginas */
+/* Base compartilhada — logout e tema */
+#btn-logout,
 #btn-theme-toggle {
   position: fixed;
   top: 20px;
-  right: 16px;
   z-index: 150;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -20,13 +20,34 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text-muted);
   box-shadow: var(--shadow);
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
   -webkit-tap-highlight-color: transparent;
 }
 
+#btn-logout:active,
 #btn-theme-toggle:active { transform: scale(0.90); }
+
+/* Logout — posicionado à esquerda do botão de tema */
+#btn-logout {
+  right: 64px; /* 16px margem + 36px tema + 12px gap */
+  color: var(--text-muted);
+}
+
+/* Tema — fixado no canto direito */
+#btn-theme-toggle {
+  right: 16px;
+  color: var(--text-muted);
+}
+
+/* Ícone de logout — preto no tema claro, branco no escuro */
+#icon-logout {
+  filter: brightness(0);
+}
+
+[data-theme="dark"] #icon-logout {
+  filter: brightness(0) invert(1);
+}
 
 /* Ícone de sol — visível no tema escuro */
 #icon-sun { display: none; color: var(--amber); }

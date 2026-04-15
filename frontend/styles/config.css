@@ -162,7 +162,7 @@
 #cfg-usuarios-btn {
   position: fixed;
   top: 20px;
-  right: 64px; /* 16px da margem + 36px do botao tema + 12px de gap */
+  right: 112px; /* 16px da margem + 36px do botao tema + 12px de gap */
   z-index: 150;
   background: var(--bg-card);
   border: 1px solid var(--border);
