@@ -68,6 +68,16 @@
     </div>
   </div>
 
+  <!-- MODAL GLOBAL: VISUALIZADOR DE IMAGEM -->
+  <div class="modal-overlay hidden" id="modal-image-viewer" style="z-index: 9999;">
+    <div class="modal" style="padding: 10px; max-width: 90vw; text-align: center; background: transparent; box-shadow: none;">
+      <button type="button" class="modal-maquina-fechar" id="modal-image-fechar" style="position:absolute; top:-30px; right:0; background:var(--card-bg); border-radius:50%; padding:5px; cursor:pointer; color:var(--text); border:none; display:flex; align-items:center; justify-content:center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <img id="image-viewer-img" src="" style="max-width: 100%; max-height: 80vh; border-radius: 8px; object-fit: contain; background: black;" alt="Foto do evento">
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="scripts/main.js?v=8" type="module"></script>
 </body>

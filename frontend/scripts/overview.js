@@ -533,8 +533,7 @@ function renderModalEventos(eventos, startTime) {
 
   const relevantes = [...eventos]
     .filter(e => ['parada', 'marcha', 'producao'].includes(e.tipo))
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    .slice(0, 10);
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   if (relevantes.length === 0) {
     container.innerHTML = '';
@@ -589,8 +588,48 @@ function renderModalEventos(eventos, startTime) {
           <div class="evento-tipo">${label}</div>
           ${motivo ? `<div class="evento-motivo">${motivo}</div>` : ''}
         </div>
-        ${duracao && ev.tipo !== 'producao' ? `<span class="evento-duracao">${duracao}</span>` : ''}
+        <div class="evento-right" style="margin-left: auto; display: flex; align-items: flex-start; gap: 14px;">
+          ${ev.foto_path ? `<button type="button" class="btn-evento-foto" data-foto="${api.fotoEventoUrl(ev.medicao_id, ev.id)}" style="background:none; border:none; padding:4px 0 0 0; margin:0; cursor:pointer;" title="Ver foto">
+              <img src="icons/modals/photo.svg" width="24" height="24" alt="Foto">
+          </button>` : ''}
+          ${duracao && ev.tipo !== 'producao' ? `<span class="evento-duracao" style="margin-left: 0;">${duracao}</span>` : ''}
+        </div>
       </div>
     `;
   }).join('');
+
+  container.querySelectorAll('.btn-evento-foto').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const url = btn.getAttribute('data-foto');
+      if (url) abrirModalFoto(url);
+    });
+  });
+}
+
+// ============================================================
+// MODAL: VISUALIZADOR DE FOTO
+// ============================================================
+
+function abrirModalFoto(url) {
+  const modal = document.getElementById('modal-image-viewer');
+  const img = document.getElementById('image-viewer-img');
+  if (!modal || !img) return;
+
+  img.src = url;
+  modal.classList.remove('hidden');
+
+  const closeBtn = document.getElementById('modal-image-fechar');
+  if (closeBtn) closeBtn.onclick = fecharModalFoto;
+  
+  modal.onclick = (e) => {
+    if (e.target === modal) fecharModalFoto();
+  };
+}
+
+function fecharModalFoto() {
+  const modal = document.getElementById('modal-image-viewer');
+  const img = document.getElementById('image-viewer-img');
+  if (modal) modal.classList.add('hidden');
+  if (img) img.src = '';
 }
