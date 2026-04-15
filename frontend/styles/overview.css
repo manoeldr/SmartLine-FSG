@@ -487,3 +487,38 @@
 .status-dot-inline.parado { background: var(--red); }
 .status-dot-inline.sem_informacao { background: var(--border); }
 .status-dot-inline.ultima_medicao { background: var(--brand); }
+
+/* ============================================================
+   RESPONSIVO E DESKTOP (PC)
+   ============================================================ */
+@media (min-width: 768px) {
+  .maquina-card-metricas { grid-template-columns: repeat(4, 1fr) !important; }
+  
+  .modal-maquina-kpis { 
+    grid-template-columns: repeat(6, 1fr) !important; 
+    gap: 16px;
+    padding: 24px;
+  }
+
+  .fluxo-maquina-box {
+    width: 86px;
+    height: 86px;
+    font-size: 0.8125rem;
+  }
+
+  /* Modal de Máquina: de Bottom Sheet para Modal Centralizado gigante */
+  #modal-maquina-detalhes {
+    justify-content: center !important; 
+    align-items: center !important;
+    padding: 24px !important;
+  }
+  
+  .modal-maquina {
+    max-width: 900px !important;
+    height: auto !important;
+    max-height: 90vh !important;
+    border-radius: 24px !important; /* Todas as pontas redondas no Desktop */
+  }
+
+  #ov-filter-panel { max-width: 100% !important; }
+}

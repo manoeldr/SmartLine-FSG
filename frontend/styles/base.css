@@ -173,3 +173,44 @@ h3 {
 .empty-state p { font-size: 1rem; font-weight: 600; color: var(--text-muted); }
 .empty-state span { font-size: 0.8125rem; color: var(--text-dim); line-height: 1.5; }
 .empty-state strong { color: var(--brand); }
+
+/* ============================================================
+   RESPONSIVO E DESKTOP (PC)
+   Distribuição espacial otimizada e esticada
+   ============================================================ */
+@media (min-width: 768px) {
+  /* Deixa o app utilizar generosamente o monitor realçando o ambiente */
+  #app {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: transparent;
+    box-shadow: none;
+  }
+  
+  #page-container {
+    max-width: 1200px;
+  }
+
+  /* Remove os fixos artificiais, voltando a ancorar normalmente nas bordas da janela */
+  #btn-theme-toggle { right: 16px !important; }
+  #btn-logout       { right: 64px !important; }
+  #ov-filter-btn    { right: 112px !important; }
+
+  /* Navbar flutuante inferior ligeiramente mais espaçosa */
+  #navbar {
+    width: auto !important;
+    min-width: 400px;
+  }
+
+  /* ── Modais Gerais mais confortáveis ── */
+  .modal-overlay {
+    display: flex;
+    justify-content: center;
+    align-items: center; 
+  }
+  .modal {
+    width: 100%;
+    max-width: 600px !important;
+    border-radius: 16px;
+  }
+}

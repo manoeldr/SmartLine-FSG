@@ -147,3 +147,13 @@
   font-size: 0.8125rem;
   color: var(--text-dim);
 }
+
+/* ============================================================
+   RESPONSIVO E DESKTOP (PC)
+   ============================================================ */
+@media (min-width: 768px) {
+  .par-summary {
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 16px;
+  }
+}

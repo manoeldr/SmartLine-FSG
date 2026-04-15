@@ -336,3 +336,17 @@
 }
 
 .alarm-item .remove-alarm:hover { color: var(--red); }
+
+/* ============================================================
+   RESPONSIVO E DESKTOP (PC)
+   ============================================================ */
+@media (min-width: 768px) {
+  .kpi-grid { 
+    grid-template-columns: repeat(4, 1fr) !important; 
+    gap: 16px; 
+    margin-bottom: 24px; 
+  }
+  .info-bar { 
+    gap: 16px; 
+  }
+}

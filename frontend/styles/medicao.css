@@ -150,3 +150,18 @@
   margin-top: 5px;
   font-weight: 600;
 }
+
+/* ============================================================
+   RESPONSIVO E DESKTOP (PC)
+   ============================================================ */
+@media (min-width: 768px) {
+  .med-counters {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 16px;
+  }
+  
+  .med-buttons {
+    max-width: 800px;
+    margin: 0 auto 32px auto;
+  }
+}
