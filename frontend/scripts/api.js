@@ -23,7 +23,6 @@ async function request(method, path, body = null) {
   try {
     const r = await fetch(`${BASE_URL}${path}`, opts);
     if (r.status === 401) {
-      // Token inválido ou expirado — limpa sessão e redireciona para login
       sessionStorage.removeItem('smartline_token');
       sessionStorage.removeItem('smartline_usuario');
       window.dispatchEvent(new CustomEvent('auth:logout'));
@@ -220,6 +219,33 @@ export const api = {
   // Retorna todas as máquinas com status de ocupação e nome do auditor.
   async ocupacaoMaquinas(linhaId) {
     return request('GET', `/linhas/${linhaId}/maquinas/ocupacao`);
+  },
+
+  // ── Fotos de eventos ─────────────────────────────────────
+
+  // Envia uma foto para o backend vinculada a um evento de parada.
+  // A imagem é comprimida para PNG pelo backend (Pillow).
+  async uploadFotoEvento(medicaoId, eventoId, file) {
+    const token = sessionStorage.getItem('smartline_token');
+    const formData = new FormData();
+    formData.append('foto', file);
+    const r = await fetch(`${BASE_URL}/medicoes/${medicaoId}/eventos/${eventoId}/foto`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `Erro ${r.status}`);
+    }
+    return r.json();
+  },
+
+  // Retorna a URL da foto de um evento para exibição direta no frontend.
+  fotoEventoUrl(medicaoId, eventoId) {
+    return `${BASE_URL}/medicoes/${medicaoId}/eventos/${eventoId}/foto`;
   },
 
   // ── Filtros ──────────────────────────────────────────────

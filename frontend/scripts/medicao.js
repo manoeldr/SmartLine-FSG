@@ -1,7 +1,7 @@
 // ============================================================
 // MEDICAO.JS — Tela de medição manual
 // Gerencia o fluxo completo de uma medição: início, marcha/parada,
-// leituras de produção, motivos de parada e finalização.
+// leituras de produção, motivos de parada, foto e finalização.
 // ============================================================
 
 import { store } from './store.js';
@@ -10,6 +10,13 @@ import { formatTime, formatTimeMM, vibrate } from './utils.js';
 
 let maquinaSelecionada = null;
 let currentMachineAlarms = [];
+
+// ID do último evento de parada registrado — usado para enviar a foto ao backend.
+let ultimoEventoParadaId = null;
+
+// ============================================================
+// INICIALIZAÇÃO
+// ============================================================
 
 // Inicializa a tela de medição. Verifica se o app está configurado
 // e exibe a tela correta: pré-início, ativa ou finalizada.
@@ -55,6 +62,7 @@ export function initMedicao() {
 // TELAS
 // ============================================================
 
+// Exibe a tela de pré-início com botão de iniciar e retomar medição.
 function showPreStartScreen() {
   document.getElementById('med-pre-start')?.classList.remove('hidden');
   document.getElementById('med-active')?.classList.add('hidden');
@@ -72,6 +80,8 @@ function showPreStartScreen() {
   verificarMedicoesNaoFinalizadas();
 }
 
+// Exibe a tela de medição ativa com timer, botões e contadores.
+// Registra todos os listeners de botões de ação.
 function showActiveScreen() {
   document.getElementById('med-pre-start')?.classList.add('hidden');
   document.getElementById('med-active')?.classList.remove('hidden');
@@ -139,6 +149,7 @@ function showActiveScreen() {
   }));
 }
 
+// Exibe a tela de medição finalizada com tempo total e produção.
 function showFinishedScreen() {
   document.getElementById('med-pre-start')?.classList.add('hidden');
   document.getElementById('med-active')?.classList.add('hidden');
@@ -165,6 +176,8 @@ function showFinishedScreen() {
 // RETOMAR MEDIÇÃO
 // ============================================================
 
+// Verifica se existem medições não finalizadas e exibe o botão de retomar.
+// Se switchScreen=true, ajusta o layout para exibir o botão mesmo sem config.
 async function verificarMedicoesNaoFinalizadas(switchScreen = false) {
   const linhaId = store.config.linhaId;
 
@@ -196,6 +209,8 @@ async function verificarMedicoesNaoFinalizadas(switchScreen = false) {
   } catch { /* silencioso */ }
 }
 
+// Abre o modal de seleção de medição a retomar.
+// Exibe lista de medições não finalizadas com data de início.
 function abrirModalRetomar(medicoes) {
   const modal = document.getElementById('modal-retomar-medicao');
   const list = document.getElementById('modal-retomar-list');
@@ -276,7 +291,6 @@ async function abrirModalIniciar() {
         const semConfig = !m.velocidade_nominal || m.sobrevelocidade === null || m.sobrevelocidade === undefined;
 
         if (m.ocupada) {
-          // Máquina ocupada — bloqueada, mostra quem está medindo
           return `
             <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}"
                  style="justify-content:flex-start;opacity:0.55;cursor:not-allowed;pointer-events:none;">
@@ -299,7 +313,6 @@ async function abrirModalIniciar() {
         `;
       }).join('');
 
-      // Apenas máquinas disponíveis são selecionáveis
       list.querySelectorAll('.alarm-item:not([style*="pointer-events:none"])').forEach(el => {
         el.addEventListener('click', () => {
           list.querySelectorAll('.alarm-item').forEach(e => e.classList.remove('selected'));
@@ -333,7 +346,6 @@ async function abrirModalIniciar() {
         nome: selected.dataset.nome,
       };
 
-      // Busca detalhes completos da máquina
       let maquinaDetalhes = null;
       try {
         const linhaId = store.config.linhaId;
@@ -394,6 +406,7 @@ function mostrarAvisoModal(msg) {
 // ============================================================
 
 // Substitui um elemento pelo seu clone para remover listeners antigos.
+// Necessário para evitar duplicação de eventos ao recarregar telas.
 function replaceWithClone(id, applyListener) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -411,6 +424,7 @@ function clearShiftEndCountdown() {
 // HANDLERS MARCHA / PARADA
 // ============================================================
 
+// Handler do botão Marcha — registra retomada e abre modal de motivo da parada anterior.
 function handleMarcha() {
   const m = store.measurement;
   if (m.state === 'running') return;
@@ -424,18 +438,128 @@ function handleMarcha() {
   });
 }
 
-function handleParada() {
+// Handler do botão Parada — registra a parada e abre modal de foto opcional.
+async function handleParada() {
   const m = store.measurement;
   if (m.state === 'stopped') return;
+
+  // Registra a parada no store e backend, captura o ID do evento retornado
+  ultimoEventoParadaId = null;
   store.setParada();
   vibrate([200, 100, 200]);
   updateButtonStates();
+
+  // Aguarda o backendId ser preenchido pelo store (via callback da API)
+  // e abre o modal de foto opcional
+  setTimeout(() => {
+    abrirModalFotoParada();
+  }, 300);
+}
+
+// ============================================================
+// MODAL: FOTO DA PARADA
+// ============================================================
+
+// Abre o modal opcional de registro fotográfico da parada.
+// O auditor pode tirar/enviar uma foto ou pular.
+function abrirModalFotoParada() {
+  const existing = document.getElementById('modal-foto-parada');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-foto-parada';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal" style="text-align:center;">
+      <h3>Registrar foto</h3>
+      <p class="modal-sub">Deseja registrar uma foto desta parada?</p>
+
+      <div id="foto-preview-container" class="hidden" style="margin-bottom:16px;">
+        <img id="foto-preview" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm);object-fit:contain;" alt="Preview">
+      </div>
+
+      <label for="foto-input" style="display:flex;align-items:center;justify-content:center;gap:8px;
+        background:var(--brand);border:none;border-radius:var(--radius-sm);
+        padding:16px;cursor:pointer;margin-bottom:16px;color:#fff;font-size:0.875rem;font-weight:500;
+        transition:opacity 0.15s;" id="foto-label">
+        <img src="icons/modals/add_photo.svg" width="24" height="24" style="filter:brightness(0) invert(1);">
+        Tirar foto ou selecionar
+      </label>
+      <input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none;">
+
+      <button class="btn btn-primary btn-block" id="btn-enviar-foto" style="display:none;margin-bottom:8px;">
+        Enviar foto
+      </button>
+      <button class="btn btn-outline btn-block" id="btn-pular-foto">
+        Pular
+      </button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const input = document.getElementById('foto-input');
+  const preview = document.getElementById('foto-preview');
+  const previewContainer = document.getElementById('foto-preview-container');
+  const btnEnviar = document.getElementById('btn-enviar-foto');
+  const label = document.getElementById('foto-label');
+
+  // Ao selecionar arquivo — exibe preview e botão de envio
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    preview.src = url;
+    previewContainer.classList.remove('hidden');
+    btnEnviar.style.display = '';
+    label.style.borderColor = 'var(--brand)';
+  });
+
+  // Envia a foto ao backend vinculada ao último evento de parada
+  btnEnviar.addEventListener('click', async () => {
+    const file = input.files[0];
+    if (!file) return;
+
+    const medicaoId = store.measurement.medicaoId;
+    const m = store.measurement;
+
+    // Busca o backendId do último evento de parada
+    const lastStop = [...m.events].reverse().find(e => e.type === 'stop');
+    const eventoId = lastStop?.backendId;
+
+    if (!medicaoId || !eventoId) {
+      modal.remove();
+      return;
+    }
+
+    btnEnviar.textContent = 'Enviando...';
+    btnEnviar.disabled = true;
+
+    try {
+      await api.uploadFotoEvento(medicaoId, eventoId, file);
+    } catch (e) {
+      console.warn('[foto] Erro ao enviar foto:', e);
+    }
+
+    modal.remove();
+  });
+
+  // Pula o registro fotográfico
+  document.getElementById('btn-pular-foto').addEventListener('click', () => {
+    modal.remove();
+  });
+
+  // Fecha ao clicar no overlay
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
 }
 
 // ============================================================
 // MODAL: MOTIVO DA PARADA
 // ============================================================
 
+// Busca os alarmes configurados da máquina atual no backend.
+// Fallback para os alarmes salvos no store se a requisição falhar.
 async function getCurrentMachineAlarms() {
   const linhaId = store.config.linhaId;
   const maquinaId = store.config.maquinaLinhaId;
@@ -456,6 +580,8 @@ async function getCurrentMachineAlarms() {
   return alarms;
 }
 
+// Abre o modal de motivo da parada como uma Promise.
+// Resolve com o motivo selecionado ou digitado pelo auditor.
 function showStopReasonModal() {
   return new Promise(async resolve => {
     const modal = document.getElementById('modal-stop-reason');
@@ -469,6 +595,7 @@ function showStopReasonModal() {
   });
 }
 
+// Renderiza a lista de alarmes no modal de motivo, agrupados por categoria.
 function renderAlarmList(alarms = store.config.alarms) {
   const list = document.getElementById('alarm-list-modal');
   if (!list) return;
@@ -494,6 +621,8 @@ function renderAlarmList(alarms = store.config.alarms) {
   });
 }
 
+// Confirma o motivo da parada — usa seleção da lista ou texto digitado.
+// Se o motivo for novo, salva na lista de alarmes da máquina.
 function handleConfirmReason() {
   const selected = document.querySelector('#alarm-list-modal .alarm-item.selected');
   const customInput = document.getElementById('custom-reason-input');
@@ -536,6 +665,8 @@ function handleConfirmReason() {
 // ATUALIZAÇÃO VISUAL DOS BOTÕES
 // ============================================================
 
+// Atualiza o visual dos botões de marcha/parada e o badge de status
+// conforme o estado atual da medição (running ou stopped).
 function updateButtonStates() {
   const m = store.measurement;
   const marchaBtn  = document.getElementById('btn-marcha');
@@ -565,6 +696,8 @@ function updateButtonStates() {
 // TICK: ATUALIZAÇÃO A CADA SEGUNDO
 // ============================================================
 
+// Atualiza os contadores visuais da medição ativa a cada segundo.
+// Chamado pelo tick global do main.js.
 export function updateMedicao() {
   const m = store.measurement;
   if (!m.active || !m.started) return;
@@ -595,6 +728,7 @@ export function updateMedicao() {
 // FINALIZAÇÃO
 // ============================================================
 
+// Exibe o modal de finalização com sugestão da última leitura de produção.
 function showFinalizeModal() {
   const lastReading = store.getLastReading();
   const input = document.getElementById('final-production-input');
@@ -602,6 +736,7 @@ function showFinalizeModal() {
   document.getElementById('modal-finalize')?.classList.remove('hidden');
 }
 
+// Confirma a finalização: registra última produção, finaliza no store e backend.
 function handleFinalize() {
   window._clearShiftEndCountdown?.();
   const input = document.getElementById('final-production-input');
@@ -615,4 +750,5 @@ function handleFinalize() {
   showFinishedScreen();
 }
 
+// Limpa recursos ao sair da tela de medição.
 export function cleanupMedicao() {}
