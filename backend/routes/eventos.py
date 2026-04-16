@@ -63,7 +63,7 @@ def atualizar_motivo(medicao_id: int, evento_id: int, motivo: str, db: Session =
     return evento
 
 
-# Recebe uma imagem, comprime para PNG e salva em fotos/.
+# Recebe uma imagem, corrige orientação EXIF, comprime para PNG e salva em fotos/.
 # Registra o caminho no campo foto_path do evento.
 @router.post("/{evento_id}/foto", response_model=EventoResponse)
 async def upload_foto(
@@ -73,7 +73,7 @@ async def upload_foto(
     db: Session = Depends(get_db)
 ):
     try:
-        from PIL import Image
+        from PIL import Image, ExifTags
         import io
     except ImportError:
         raise HTTPException(status_code=500, detail="Pillow não instalado. Execute: pip install Pillow")
@@ -85,9 +85,26 @@ async def upload_foto(
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
 
-    # Lê e comprime a imagem para PNG
+    # Lê a imagem
     conteudo = await foto.read()
     img = Image.open(io.BytesIO(conteudo))
+
+    # Corrige orientação baseada nos metadados EXIF
+    # Fotos de celular frequentemente têm rotação embutida nos metadados
+    try:
+        exif = img._getexif()
+        if exif:
+            for tag, value in exif.items():
+                if ExifTags.TAGS.get(tag) == 'Orientation':
+                    if value == 3:
+                        img = img.rotate(180, expand=True)
+                    elif value == 6:
+                        img = img.rotate(270, expand=True)
+                    elif value == 8:
+                        img = img.rotate(90, expand=True)
+                    break
+    except Exception:
+        pass  # Ignora erros de EXIF — continua sem corrigir
 
     # Converte para RGB se necessário (ex: RGBA, CMYK)
     if img.mode not in ("RGB", "L"):

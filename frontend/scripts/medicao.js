@@ -42,17 +42,7 @@ export function initMedicao() {
     return;
   }
 
-  const cfg = store.config;
-  const configurado = cfg.client && cfg.linhaId;
-
-  if (!configurado) {
-    if (notConfigured) notConfigured.classList.remove('hidden');
-    if (content) content.classList.add('hidden');
-    if (badge) { badge.textContent = 'Não configurado'; badge.className = 'badge'; }
-    verificarMedicoesNaoFinalizadas(true);
-    return;
-  }
-
+  // Qualquer usuário pode iniciar medição — não exige config prévia
   if (notConfigured) notConfigured.classList.add('hidden');
   if (content) content.classList.remove('hidden');
   showPreStartScreen();
@@ -81,7 +71,6 @@ function showPreStartScreen() {
 }
 
 // Exibe a tela de medição ativa com timer, botões e contadores.
-// Registra todos os listeners de botões de ação.
 function showActiveScreen() {
   document.getElementById('med-pre-start')?.classList.add('hidden');
   document.getElementById('med-active')?.classList.remove('hidden');
@@ -177,13 +166,14 @@ function showFinishedScreen() {
 // ============================================================
 
 // Verifica se existem medições não finalizadas e exibe o botão de retomar.
-// Se switchScreen=true, ajusta o layout para exibir o botão mesmo sem config.
 async function verificarMedicoesNaoFinalizadas(switchScreen = false) {
-  const linhaId = store.config.linhaId;
-
   try {
-    const medicoes = await api.listarMedicoes(linhaId ? { linhaId } : {});
-    const naoFinalizadas = medicoes.filter(m => !m.timestamp_fim);
+    const medicoes = await api.listarMedicoes({});
+    // Filtra apenas medições do usuário logado que não foram finalizadas
+    const naoFinalizadas = medicoes.filter(m =>
+      !m.timestamp_fim &&
+      m.usuario_nome === window.usuarioAtual?.nome
+    );
     if (naoFinalizadas.length === 0) return;
 
     if (switchScreen) {
@@ -210,7 +200,6 @@ async function verificarMedicoesNaoFinalizadas(switchScreen = false) {
 }
 
 // Abre o modal de seleção de medição a retomar.
-// Exibe lista de medições não finalizadas com data de início.
 function abrirModalRetomar(medicoes) {
   const modal = document.getElementById('modal-retomar-medicao');
   const list = document.getElementById('modal-retomar-list');
@@ -265,53 +254,144 @@ function abrirModalRetomar(medicoes) {
 // MODAL: INICIAR MEDIÇÃO
 // ============================================================
 
-// Abre o modal de início de medição.
-// Mostra todas as máquinas da linha — disponíveis e ocupadas.
-// Máquinas ocupadas exibem o nome do auditor que está medindo e ficam bloqueadas.
+// Abre o modal de início de medição com seleção de cliente → linha → máquina.
+// Qualquer usuário pode iniciar uma medição sem precisar configurar previamente.
 async function abrirModalIniciar() {
   const modal = document.getElementById('modal-iniciar-medicao');
   const list = document.getElementById('modal-maquinas-list');
   const empty = document.getElementById('modal-maquinas-empty');
   if (!modal || !list) return;
 
-  list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Carregando...</p>';
+  // Estado interno do modal
+  let clienteSelecionadoId = store.config.clienteId || null;
+  let clienteSelecionadoNome = store.config.client || '';
+  let linhaSelecionadaId = store.config.linhaId || null;
+  let linhaSelecionadaNome = '';
+
   modal.classList.remove('hidden');
 
-  try {
-    const linhaId = store.config.linhaId;
-    const maquinas = await api.ocupacaoMaquinas(linhaId);
+  // Renderiza o seletor de cliente → linha → máquina em sequência
+  async function renderEtapaCliente() {
+    list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Carregando clientes...</p>';
+    if (empty) empty.classList.add('hidden');
 
-    if (maquinas.length === 0) {
-      list.innerHTML = '';
-      if (empty) empty.classList.remove('hidden');
-    } else {
+    try {
+      const clientes = await api.listarClientes();
+      if (clientes.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Nenhum cliente cadastrado</p>';
+        return;
+      }
+
+      // Subtítulo da etapa
+      const sub = modal.querySelector('.modal-sub');
+      if (sub) sub.textContent = 'Selecione o cliente';
+
+      list.innerHTML = clientes.map(c => `
+        <div class="alarm-item" data-id="${c.id}" data-nome="${c.nome}" style="justify-content:flex-start;">
+          <span>${c.nome}</span>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('.alarm-item').forEach(el => {
+        el.addEventListener('click', () => {
+          clienteSelecionadoId = parseInt(el.dataset.id);
+          clienteSelecionadoNome = el.dataset.nome;
+          renderEtapaLinha();
+        });
+      });
+    } catch {
+      list.innerHTML = '<p style="color:var(--red);font-size:0.875rem;text-align:center;">Erro ao carregar clientes</p>';
+    }
+  }
+
+  async function renderEtapaLinha() {
+    list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Carregando linhas...</p>';
+
+    const sub = modal.querySelector('.modal-sub');
+    if (sub) sub.textContent = `${clienteSelecionadoNome} → Selecione a linha`;
+
+    try {
+      const linhas = await api.listarLinhas(clienteSelecionadoId);
+      if (linhas.length === 0) {
+        list.innerHTML = `
+          <p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Nenhuma linha cadastrada</p>
+          <button class="btn btn-outline btn-block" id="btn-voltar-cliente" style="margin-top:8px;">← Voltar</button>
+        `;
+        document.getElementById('btn-voltar-cliente')?.addEventListener('click', renderEtapaCliente);
+        return;
+      }
+
+      list.innerHTML = `
+        <button class="btn btn-outline btn-block" id="btn-voltar-cliente" style="margin-bottom:8px;font-size:0.8rem;">← Voltar</button>
+        ${linhas.map(l => `
+          <div class="alarm-item" data-id="${l.id}" data-nome="${l.nome}" style="justify-content:flex-start;">
+            <span>${l.nome}</span>
+          </div>
+        `).join('')}
+      `;
+
+      document.getElementById('btn-voltar-cliente')?.addEventListener('click', renderEtapaCliente);
+
+      list.querySelectorAll('.alarm-item').forEach(el => {
+        el.addEventListener('click', () => {
+          linhaSelecionadaId = parseInt(el.dataset.id);
+          linhaSelecionadaNome = el.dataset.nome;
+          renderEtapaMaquina();
+        });
+      });
+    } catch {
+      list.innerHTML = '<p style="color:var(--red);font-size:0.875rem;text-align:center;">Erro ao carregar linhas</p>';
+    }
+  }
+
+  async function renderEtapaMaquina() {
+    list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Carregando máquinas...</p>';
+
+    const sub = modal.querySelector('.modal-sub');
+    if (sub) sub.textContent = `${clienteSelecionadoNome} → ${linhaSelecionadaNome} → Selecione a máquina`;
+
+    try {
+      const maquinas = await api.ocupacaoMaquinas(linhaSelecionadaId);
+
+      if (maquinas.length === 0) {
+        list.innerHTML = `
+          <p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Nenhuma máquina cadastrada</p>
+          <button class="btn btn-outline btn-block" id="btn-voltar-linha" style="margin-top:8px;">← Voltar</button>
+        `;
+        document.getElementById('btn-voltar-linha')?.addEventListener('click', renderEtapaLinha);
+        return;
+      }
+
       if (empty) empty.classList.add('hidden');
 
-      list.innerHTML = maquinas.map(m => {
-        const semConfig = !m.velocidade_nominal || m.sobrevelocidade === null || m.sobrevelocidade === undefined;
-
-        if (m.ocupada) {
+      list.innerHTML = `
+        <button class="btn btn-outline btn-block" id="btn-voltar-linha" style="margin-bottom:8px;font-size:0.8rem;">← Voltar</button>
+        ${maquinas.map(m => {
+          const semConfig = !m.velocidade_nominal || m.sobrevelocidade === null || m.sobrevelocidade === undefined;
+          if (m.ocupada) {
+            return `
+              <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}"
+                   style="justify-content:flex-start;opacity:0.55;cursor:not-allowed;pointer-events:none;">
+                <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
+                <span>${m.nome}</span>
+                <span style="margin-left:auto;font-size:0.7rem;color:var(--text-dim);font-weight:500;display:flex;align-items:center;gap:4px;">
+                  <img src="icons/modals/lock.svg" width="12" height="12" style="filter:brightness(0);">
+                  ${m.auditor || 'Em medição'}
+                </span>
+              </div>
+            `;
+          }
           return `
-            <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}"
-                 style="justify-content:flex-start;opacity:0.55;cursor:not-allowed;pointer-events:none;">
+            <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}" style="justify-content:flex-start;">
               <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
               <span>${m.nome}</span>
-              <span style="margin-left:auto;font-size:0.7rem;color:var(--text-dim);font-weight:500;display:flex;align-items:center;gap:4px;">
-                <img src="icons/modals/lock.svg" width="12" height="12" style="filter:brightness(0);">
-                ${m.auditor || 'Em medição'}
-              </span>
+              ${semConfig ? '<span style="margin-left:auto;font-size:0.65rem;color:var(--amber);font-weight:600;">⚠ config.</span>' : ''}
             </div>
           `;
-        }
+        }).join('')}
+      `;
 
-        return `
-          <div class="alarm-item" data-id="${m.id}" data-nome="${m.nome}" style="justify-content:flex-start;">
-            <span style="font-weight:600;margin-right:8px;color:var(--text-dim)">${m.ordem}.</span>
-            <span>${m.nome}</span>
-            ${semConfig ? '<span style="margin-left:auto;font-size:0.65rem;color:var(--amber);font-weight:600;">⚠ config.</span>' : ''}
-          </div>
-        `;
-      }).join('');
+      document.getElementById('btn-voltar-linha')?.addEventListener('click', renderEtapaLinha);
 
       list.querySelectorAll('.alarm-item:not([style*="pointer-events:none"])').forEach(el => {
         el.addEventListener('click', () => {
@@ -319,12 +399,21 @@ async function abrirModalIniciar() {
           el.classList.add('selected');
         });
       });
+    } catch {
+      list.innerHTML = '<p style="color:var(--red);font-size:0.875rem;text-align:center;">Erro ao carregar máquinas</p>';
     }
-  } catch {
-    list.innerHTML = '<p style="color:var(--red);font-size:0.875rem;text-align:center;">Erro ao carregar máquinas</p>';
   }
 
-  // Ao confirmar: valida seleção, busca detalhes e inicia medição
+  // Inicia no cliente se não tiver linha configurada, ou direto nas máquinas
+  if (linhaSelecionadaId) {
+    await renderEtapaMaquina();
+  } else if (clienteSelecionadoId) {
+    await renderEtapaLinha();
+  } else {
+    await renderEtapaCliente();
+  }
+
+  // Confirmar início
   replaceWithClone('btn-confirmar-inicio', el => {
     el.addEventListener('click', async () => {
       const selected = list.querySelector('.alarm-item.selected');
@@ -348,8 +437,7 @@ async function abrirModalIniciar() {
 
       let maquinaDetalhes = null;
       try {
-        const linhaId = store.config.linhaId;
-        const todasMaquinas = await api.listarMaquinas(linhaId);
+        const todasMaquinas = await api.listarMaquinas(linhaSelecionadaId);
         maquinaDetalhes = todasMaquinas.find(m => m.id === maquinaSelecionada.id);
       } catch { /* silencioso */ }
 
@@ -365,7 +453,11 @@ async function abrirModalIniciar() {
 
       const multiplier = Number(maquinaDetalhes?.multiplicador_produto ?? store.config.productMultiplier ?? 1) || 1;
 
+      // Salva cliente, linha e máquina no store
       store.updateConfig({
+        client: clienteSelecionadoNome,
+        clienteId: clienteSelecionadoId,
+        linhaId: linhaSelecionadaId,
         machine: maquinaSelecionada.nome,
         maquinaLinhaId: maquinaSelecionada.id,
         speed: rawSpeed,
@@ -405,8 +497,6 @@ function mostrarAvisoModal(msg) {
 // HELPERS
 // ============================================================
 
-// Substitui um elemento pelo seu clone para remover listeners antigos.
-// Necessário para evitar duplicação de eventos ao recarregar telas.
 function replaceWithClone(id, applyListener) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -415,7 +505,6 @@ function replaceWithClone(id, applyListener) {
   applyListener(clone);
 }
 
-// Limpa o countdown de fim de turno via main.js.
 function clearShiftEndCountdown() {
   window._clearShiftEndCountdown?.();
 }
@@ -424,7 +513,6 @@ function clearShiftEndCountdown() {
 // HANDLERS MARCHA / PARADA
 // ============================================================
 
-// Handler do botão Marcha — registra retomada e abre modal de motivo da parada anterior.
 function handleMarcha() {
   const m = store.measurement;
   if (m.state === 'running') return;
@@ -438,19 +526,15 @@ function handleMarcha() {
   });
 }
 
-// Handler do botão Parada — registra a parada e abre modal de foto opcional.
 async function handleParada() {
   const m = store.measurement;
   if (m.state === 'stopped') return;
 
-  // Registra a parada no store e backend, captura o ID do evento retornado
   ultimoEventoParadaId = null;
   store.setParada();
   vibrate([200, 100, 200]);
   updateButtonStates();
 
-  // Aguarda o backendId ser preenchido pelo store (via callback da API)
-  // e abre o modal de foto opcional
   setTimeout(() => {
     abrirModalFotoParada();
   }, 300);
@@ -460,8 +544,6 @@ async function handleParada() {
 // MODAL: FOTO DA PARADA
 // ============================================================
 
-// Abre o modal opcional de registro fotográfico da parada.
-// O auditor pode tirar/enviar uma foto ou pular.
 function abrirModalFotoParada() {
   const existing = document.getElementById('modal-foto-parada');
   if (existing) existing.remove();
@@ -501,35 +583,25 @@ function abrirModalFotoParada() {
   const preview = document.getElementById('foto-preview');
   const previewContainer = document.getElementById('foto-preview-container');
   const btnEnviar = document.getElementById('btn-enviar-foto');
-  const label = document.getElementById('foto-label');
 
-  // Ao selecionar arquivo — exibe preview e botão de envio
   input.addEventListener('change', () => {
     const file = input.files[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    preview.src = url;
+    preview.src = URL.createObjectURL(file);
     previewContainer.classList.remove('hidden');
     btnEnviar.style.display = '';
-    label.style.borderColor = 'var(--brand)';
   });
 
-  // Envia a foto ao backend vinculada ao último evento de parada
   btnEnviar.addEventListener('click', async () => {
     const file = input.files[0];
     if (!file) return;
 
     const medicaoId = store.measurement.medicaoId;
     const m = store.measurement;
-
-    // Busca o backendId do último evento de parada
     const lastStop = [...m.events].reverse().find(e => e.type === 'stop');
     const eventoId = lastStop?.backendId;
 
-    if (!medicaoId || !eventoId) {
-      modal.remove();
-      return;
-    }
+    if (!medicaoId || !eventoId) { modal.remove(); return; }
 
     btnEnviar.textContent = 'Enviando...';
     btnEnviar.disabled = true;
@@ -543,23 +615,14 @@ function abrirModalFotoParada() {
     modal.remove();
   });
 
-  // Pula o registro fotográfico
-  document.getElementById('btn-pular-foto').addEventListener('click', () => {
-    modal.remove();
-  });
-
-  // Fecha ao clicar no overlay
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.remove();
-  });
+  document.getElementById('btn-pular-foto').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
 }
 
 // ============================================================
 // MODAL: MOTIVO DA PARADA
 // ============================================================
 
-// Busca os alarmes configurados da máquina atual no backend.
-// Fallback para os alarmes salvos no store se a requisição falhar.
 async function getCurrentMachineAlarms() {
   const linhaId = store.config.linhaId;
   const maquinaId = store.config.maquinaLinhaId;
@@ -580,8 +643,6 @@ async function getCurrentMachineAlarms() {
   return alarms;
 }
 
-// Abre o modal de motivo da parada como uma Promise.
-// Resolve com o motivo selecionado ou digitado pelo auditor.
 function showStopReasonModal() {
   return new Promise(async resolve => {
     const modal = document.getElementById('modal-stop-reason');
@@ -595,7 +656,6 @@ function showStopReasonModal() {
   });
 }
 
-// Renderiza a lista de alarmes no modal de motivo, agrupados por categoria.
 function renderAlarmList(alarms = store.config.alarms) {
   const list = document.getElementById('alarm-list-modal');
   if (!list) return;
@@ -621,8 +681,6 @@ function renderAlarmList(alarms = store.config.alarms) {
   });
 }
 
-// Confirma o motivo da parada — usa seleção da lista ou texto digitado.
-// Se o motivo for novo, salva na lista de alarmes da máquina.
 function handleConfirmReason() {
   const selected = document.querySelector('#alarm-list-modal .alarm-item.selected');
   const customInput = document.getElementById('custom-reason-input');
@@ -665,8 +723,6 @@ function handleConfirmReason() {
 // ATUALIZAÇÃO VISUAL DOS BOTÕES
 // ============================================================
 
-// Atualiza o visual dos botões de marcha/parada e o badge de status
-// conforme o estado atual da medição (running ou stopped).
 function updateButtonStates() {
   const m = store.measurement;
   const marchaBtn  = document.getElementById('btn-marcha');
@@ -696,8 +752,6 @@ function updateButtonStates() {
 // TICK: ATUALIZAÇÃO A CADA SEGUNDO
 // ============================================================
 
-// Atualiza os contadores visuais da medição ativa a cada segundo.
-// Chamado pelo tick global do main.js.
 export function updateMedicao() {
   const m = store.measurement;
   if (!m.active || !m.started) return;
@@ -728,7 +782,6 @@ export function updateMedicao() {
 // FINALIZAÇÃO
 // ============================================================
 
-// Exibe o modal de finalização com sugestão da última leitura de produção.
 function showFinalizeModal() {
   const lastReading = store.getLastReading();
   const input = document.getElementById('final-production-input');
@@ -736,7 +789,6 @@ function showFinalizeModal() {
   document.getElementById('modal-finalize')?.classList.remove('hidden');
 }
 
-// Confirma a finalização: registra última produção, finaliza no store e backend.
 function handleFinalize() {
   window._clearShiftEndCountdown?.();
   const input = document.getElementById('final-production-input');
@@ -750,5 +802,4 @@ function handleFinalize() {
   showFinishedScreen();
 }
 
-// Limpa recursos ao sair da tela de medição.
 export function cleanupMedicao() {}

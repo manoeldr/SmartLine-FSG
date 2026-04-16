@@ -117,15 +117,17 @@
       <h3>Motivo da parada</h3>
       <p class="modal-sub">Selecione o motivo ou digite um novo</p>
       <div class="alarm-list" id="alarm-list-modal"></div>
-      <div class="modal-input-row" style="gap: 8px; align-items: center;">
-        <input type="text" id="custom-reason-input" placeholder="Outro motivo..." class="input" style="flex:1;">
-        <select id="custom-reason-category" class="input" style="width:130px;">
-          <option value="Interna">Interna</option>
-          <option value="Externa">Externa</option>
-        </select>
-        <button class="btn btn-sm" id="btn-add-custom-reason">+</button>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+        <input type="text" id="custom-reason-input" placeholder="Outro motivo..." class="input">
+        <div style="display:flex;gap:8px;">
+          <select id="custom-reason-category" class="input" style="flex:1;">
+            <option value="Interna">Interna</option>
+            <option value="Externa">Externa</option>
+          </select>
+          <button class="btn btn-sm" id="btn-add-custom-reason">+</button>
+        </div>
       </div>
-      <button class="btn btn-primary" id="btn-confirm-reason">Confirmar</button>
+      <button class="btn btn-primary btn-block" id="btn-confirm-reason">Confirmar</button>
     </div>
   </div>
 

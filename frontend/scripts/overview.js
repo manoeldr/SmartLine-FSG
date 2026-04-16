@@ -16,6 +16,7 @@ let modalPieChart = null;
 let ultimoStatus = [];
 let filtrosAtivos = {};
 let lastFluxoUpdateTime = 0;
+let linhaAtualId = null;
 
 const FLUXO_UPDATE_INTERVAL_MS = 30_000;
 
@@ -26,13 +27,34 @@ export async function initOverview() {
   ultimoStatus = [];
   filtrosAtivos = {};
   lastFluxoUpdateTime = 0;
+  linhaAtualId = store.config.linhaId || null;
+
+  if (!linhaAtualId) {
+    linhaAtualId = await detectarLinhaAtiva();
+  }
 
   iniciarClock();
-  inicializarFiltros();
+  await inicializarFiltros();
   configurarFiltroUI();
   await renderFluxoLinha();
   await carregarDadosCritica();
   lastFluxoUpdateTime = Date.now();
+}
+
+// Tenta encontrar uma linha com medição ativa para exibir no overview.
+async function detectarLinhaAtiva() {
+  try {
+    const medicoes = await api.listarMedicoes({});
+    const ativa = medicoes.find(m => !m.timestamp_fim && m.linha_id);
+    if (ativa?.linha_id) return ativa.linha_id;
+
+    const clientes = await api.listarClientes();
+    if (clientes.length > 0) {
+      const linhas = await api.listarLinhas(clientes[0].id);
+      if (linhas.length > 0) return linhas[0].id;
+    }
+  } catch { /* silencioso */ }
+  return null;
 }
 
 // Atualiza a tela a cada segundo (chamada pelo tick global do main.js).
@@ -62,7 +84,7 @@ function atualizarClock() {
 // ============================================================
 
 async function inicializarFiltros() {
-  const linhaId = store.config.linhaId;
+  const linhaId = linhaAtualId;
   if (!linhaId) return;
 
   try {
@@ -115,12 +137,11 @@ function configurarFiltroUI() {
   });
 
   document.getElementById('ov-filter-aplicar')?.addEventListener('click', async () => {
-    const linhaId = store.config.linhaId;
     const maquinaId = document.getElementById('ov-filter-maquina')?.value;
     const turno = document.getElementById('ov-filter-turno')?.value;
     const data = document.getElementById('ov-filter-data')?.value;
 
-    filtrosAtivos = { linhaId };
+    filtrosAtivos = { linhaId: linhaAtualId };
     if (maquinaId) filtrosAtivos.maquinaLinhaId = maquinaId;
     if (turno) filtrosAtivos.turnoInicio = turno;
     if (data) { filtrosAtivos.dataInicio = data; filtrosAtivos.dataFim = data; }
@@ -144,15 +165,16 @@ function configurarFiltroUI() {
 // DADOS DA MÁQUINA CRÍTICA
 // ============================================================
 
-// Busca e exibe os dados da máquina crítica.
-// Indicadores calculados pelo backend via /medicoes/{id}/indicadores.
 async function carregarDadosCritica() {
-  const linhaId = store.config.linhaId;
+  const linhaId = linhaAtualId;
   if (!linhaId) {
     document.getElementById('ov-no-data')?.classList.remove('hidden');
     document.getElementById('ov-content')?.classList.add('hidden');
     return;
   }
+
+  document.getElementById('ov-no-data')?.classList.add('hidden');
+  document.getElementById('ov-content')?.classList.remove('hidden');
 
   try {
     const status = await api.statusLinha(linhaId);
@@ -189,7 +211,6 @@ async function carregarDadosCritica() {
       });
 
       if (medicoes.length > 0) {
-        // Busca indicadores calculados pelo backend
         const indicadores = await api.indicadoresMedicao(medicoes[0].id);
         exibirIndicadores(indicadores);
         renderBarChart(medicoes[0]);
@@ -202,7 +223,6 @@ async function carregarDadosCritica() {
   }
 }
 
-// Exibe os indicadores retornados pelo backend no painel do overview.
 function exibirIndicadores(ind) {
   document.getElementById('ov-total-stops').textContent = ind.num_paradas ?? '—';
   document.getElementById('ov-mtbf').textContent = ind.mtbf_ms ? formatTimeMM(ind.mtbf_ms) : '—';
@@ -323,14 +343,13 @@ async function renderFluxoLinha() {
   const container = document.getElementById('ov-fluxo-linha');
   if (!container) return;
 
-  const linhaId = store.config.linhaId;
-  if (!linhaId) {
-    container.innerHTML = '<p class="empty-state-sm">Linha não configurada</p>';
+  if (!linhaAtualId) {
+    container.innerHTML = '<p class="empty-state-sm">Nenhuma linha disponível</p>';
     return;
   }
 
   try {
-    const status = await api.statusLinha(linhaId);
+    const status = await api.statusLinha(linhaAtualId);
     ultimoStatus = status;
 
     if (status.length === 0) {
@@ -379,8 +398,6 @@ async function renderFluxoLinha() {
 // MODAL: DETALHES DA MÁQUINA
 // ============================================================
 
-// Abre o modal bottom sheet com os detalhes completos de uma máquina.
-// Indicadores OEE, MTBF, MTTR e paradas calculados pelo backend.
 async function abrirModalMaquina(maquina) {
   const modal = document.getElementById('modal-maquina-detalhes');
   if (!modal) return;
@@ -392,7 +409,6 @@ async function abrirModalMaquina(maquina) {
   const statusLabels = { rodando: 'Rodando', parado: 'Parada', sem_informacao: 'Sem informação', ultima_medicao: 'Última medição' };
   document.getElementById('modal-maq-sub').textContent = statusLabels[maquina.estado] || '—';
 
-  // KPIs básicos do status (já calculados pelo backend no statusLinha)
   document.getElementById('modal-maq-producao').textContent = maquina.producao !== null && maquina.producao !== undefined
     ? maquina.producao.toLocaleString('pt-BR') : '0';
   document.getElementById('modal-maq-eficiencia').textContent = maquina.eficiencia !== null ? `${maquina.eficiencia}%` : '0%';
@@ -401,7 +417,6 @@ async function abrirModalMaquina(maquina) {
   document.getElementById('modal-maq-mttr').textContent = maquina.mttr_ms ? formatTimeMM(maquina.mttr_ms) : '00:00';
   document.getElementById('modal-maq-oee').textContent = '—';
 
-  // Limpa conteúdo anterior
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
   document.getElementById('modal-maq-eventos').innerHTML = '';
   const legendElement = document.getElementById('modal-maq-pie-legend');
@@ -426,23 +441,17 @@ async function abrirModalMaquina(maquina) {
 
   try {
     const medicoes = await api.listarMedicoes({
-      linhaId: store.config.linhaId,
+      linhaId: linhaAtualId,
       maquinaLinhaId: maquina.maquina_id,
     });
 
     if (medicoes.length > 0) {
       const medicao = medicoes[0];
-
-      // Busca indicadores calculados pelo backend — fonte única de verdade
       const ind = await api.indicadoresMedicao(medicao.id);
-
       document.getElementById('modal-maq-oee').textContent = formatPercent(ind.oee ?? 0);
-
-      // Donut de paradas usando dados já calculados pelo backend
       renderModalDonutFromIndicadores(ind, medicao);
-
-      // Timeline de eventos (ainda usa os eventos da medição para exibir detalhes)
-      renderModalEventos(medicao.eventos || [], new Date(medicao.timestamp_inicio));
+      // Passa a medição completa para incluir início e fim na timeline
+      renderModalEventos(medicao.eventos || [], medicao);
     }
   } catch (e) {
     console.warn('[modal] Erro ao carregar detalhes:', e);
@@ -455,7 +464,6 @@ function fecharModal() {
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
 }
 
-// Renderiza o donut de paradas usando os dados calculados pelo backend.
 function renderModalDonutFromIndicadores(ind, medicao) {
   const canvas = document.getElementById('modal-maq-pie');
   const legend = document.getElementById('modal-maq-pie-legend');
@@ -476,7 +484,6 @@ function renderModalDonutFromIndicadores(ind, medicao) {
   inner?.classList.remove('hidden');
   noStops?.classList.add('hidden');
 
-  // Tempo total parado no centro do donut
   document.getElementById('modal-donut-time').textContent = formatTimeMM(ind.stopped_ms ?? 0);
   document.getElementById('modal-donut-pct').textContent = `${ind.num_paradas} paradas`;
 
@@ -526,13 +533,33 @@ function renderModalDonutFromIndicadores(ind, medicao) {
 }
 
 // Renderiza a timeline de eventos recentes no modal.
-function renderModalEventos(eventos, startTime) {
+// Inclui eventos sintéticos de início e fim da medição.
+function renderModalEventos(eventos, medicao) {
   const container = document.getElementById('modal-maq-eventos');
   const noEventos = document.getElementById('modal-maq-no-eventos');
   if (!container) return;
 
-  const relevantes = [...eventos]
-    .filter(e => ['parada', 'marcha', 'producao'].includes(e.tipo))
+  // Eventos sintéticos de início e fim — não vêm do backend, são gerados aqui
+  const eventoInicio = {
+    tipo: 'inicio',
+    timestamp: medicao.timestamp_inicio,
+    motivo: null,
+    producao_leitura: medicao.producao_inicial ?? null,
+    foto_path: null,
+  };
+
+  const eventosFim = medicao.timestamp_fim ? [{
+    tipo: 'fim',
+    timestamp: medicao.timestamp_fim,
+    motivo: null,
+    producao_leitura: medicao.producao_final ?? null,
+    foto_path: null,
+  }] : [];
+
+  const todosEventos = [eventoInicio, ...eventos, ...eventosFim];
+
+  const relevantes = [...todosEventos]
+    .filter(e => ['parada', 'marcha', 'producao', 'inicio', 'fim'].includes(e.tipo))
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   if (relevantes.length === 0) {
@@ -543,19 +570,25 @@ function renderModalEventos(eventos, startTime) {
 
   noEventos?.classList.add('hidden');
 
-  const todosCronologicos = [...eventos]
-    .filter(e => ['parada', 'marcha', 'producao'].includes(e.tipo))
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const todosCronologicos = [...relevantes].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
   const agora = new Date();
 
   const iconePorTipo = {
+    inicio: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+    fim: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>`,
     parada: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`,
     marcha: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
     producao: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
   };
 
-  const labelPorTipo = { parada: 'Parada', marcha: 'Rodando', producao: 'Produção' };
+  const labelPorTipo = {
+    inicio: 'Início da medição',
+    fim: 'Medição finalizada',
+    parada: 'Parada',
+    marcha: 'Rodando',
+    producao: 'Produção',
+  };
 
   container.innerHTML = relevantes.map(ev => {
     const hora = new Date(ev.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -566,33 +599,42 @@ function renderModalEventos(eventos, startTime) {
     if (ev.tipo === 'parada') motivo = ev.motivo || 'Sem informação';
     if (ev.tipo === 'marcha') motivo = 'Retomada';
     if (ev.tipo === 'producao') motivo = `${ev.producao_leitura?.toLocaleString('pt-BR') || '—'} un`;
+    if (ev.tipo === 'inicio') motivo = ev.producao_leitura !== null ? `Produção inicial: ${ev.producao_leitura?.toLocaleString('pt-BR')} un` : '';
+    if (ev.tipo === 'fim') motivo = ev.producao_leitura !== null ? `Produção final: ${ev.producao_leitura?.toLocaleString('pt-BR')} un` : '';
 
     let duracao = '';
     const idxCron = todosCronologicos.findIndex(e => e.timestamp === ev.timestamp && e.tipo === ev.tipo);
-    if (idxCron !== -1) {
+    if (idxCron !== -1 && ev.tipo !== 'fim') {
       const proximo = todosCronologicos[idxCron + 1];
       const fim = proximo ? new Date(proximo.timestamp) : agora;
       const durationMs = fim - new Date(ev.timestamp);
-      if (durationMs > 0) {
+      if (durationMs > 0 && ev.tipo !== 'producao') {
         const mins = Math.floor(durationMs / 60000);
         const secs = Math.floor((durationMs % 60000) / 1000);
         duracao = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
       }
     }
 
+    // Cor do ícone por tipo
+    const iconClass = ev.tipo === 'inicio' ? 'marcha' :
+                      ev.tipo === 'fim' ? 'parada' : ev.tipo;
+
     return `
       <div class="evento-item">
         <span class="evento-hora">${hora}</span>
-        <div class="evento-icone ${ev.tipo}">${icone}</div>
+        <div class="evento-icone ${iconClass}">${icone}</div>
         <div class="evento-body">
           <div class="evento-tipo">${label}</div>
           ${motivo ? `<div class="evento-motivo">${motivo}</div>` : ''}
         </div>
-        <div class="evento-right" style="margin-left: auto; display: flex; align-items: flex-start; gap: 14px;">
-          ${ev.foto_path ? `<button type="button" class="btn-evento-foto" data-foto="${api.fotoEventoUrl(ev.medicao_id, ev.id)}" style="background:none; border:none; padding:4px 0 0 0; margin:0; cursor:pointer;" title="Ver foto">
+        <div class="evento-right" style="margin-left:auto;display:flex;align-items:flex-start;gap:14px;">
+          ${ev.foto_path ? `
+            <button type="button" class="btn-evento-foto"
+              data-foto="${api.fotoEventoUrl(ev.medicao_id, ev.id)}"
+              style="background:none;border:none;padding:4px 0 0 0;cursor:pointer;" title="Ver foto">
               <img src="icons/modals/photo.svg" width="24" height="24" alt="Foto">
-          </button>` : ''}
-          ${duracao && ev.tipo !== 'producao' ? `<span class="evento-duracao" style="margin-left: 0;">${duracao}</span>` : ''}
+            </button>` : ''}
+          ${duracao ? `<span class="evento-duracao" style="margin-left:0;">${duracao}</span>` : ''}
         </div>
       </div>
     `;
@@ -601,8 +643,7 @@ function renderModalEventos(eventos, startTime) {
   container.querySelectorAll('.btn-evento-foto').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const url = btn.getAttribute('data-foto');
-      if (url) abrirModalFoto(url);
+      abrirModalFoto(btn.getAttribute('data-foto'));
     });
   });
 }
@@ -615,16 +656,11 @@ function abrirModalFoto(url) {
   const modal = document.getElementById('modal-image-viewer');
   const img = document.getElementById('image-viewer-img');
   if (!modal || !img) return;
-
   img.src = url;
   modal.classList.remove('hidden');
-
   const closeBtn = document.getElementById('modal-image-fechar');
   if (closeBtn) closeBtn.onclick = fecharModalFoto;
-  
-  modal.onclick = (e) => {
-    if (e.target === modal) fecharModalFoto();
-  };
+  modal.onclick = (e) => { if (e.target === modal) fecharModalFoto(); };
 }
 
 function fecharModalFoto() {

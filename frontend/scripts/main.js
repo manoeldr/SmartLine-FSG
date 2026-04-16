@@ -74,8 +74,9 @@ async function loadPageLogin() {
 }
 
 // Entra no app após login bem sucedido.
-// Exibe navbar, tema, logout e redireciona conforme o nível do usuário.
-function entrarNoApp(usuario) {
+// Valida se a medição salva no store ainda pertence a este usuário.
+// Se não pertencer ou já estiver finalizada, reseta o store.
+async function entrarNoApp(usuario) {
   navbar?.classList.remove('hidden');
   if (btnThemeToggle) btnThemeToggle.style.display = '';
 
@@ -86,6 +87,22 @@ function entrarNoApp(usuario) {
   }
 
   aplicarPermissoesNavbar(usuario.nivel);
+
+  // Valida medição ativa no store — evita que outro usuário
+  // veja modais de produção de uma medição que não é dele
+  const m = store.measurement;
+  if (m.active && m.medicaoId) {
+    try {
+      const med = await api.getMedicao(m.medicaoId);
+      // Reseta se a medição foi finalizada ou pertence a outro usuário
+      if (med.timestamp_fim || med.usuario_nome !== usuario.nome) {
+        store.resetMeasurement();
+      }
+    } catch {
+      // Medição não encontrada no backend — reseta o store
+      store.resetMeasurement();
+    }
+  }
 
   const paginaInicial = {
     admin: 'overview',
@@ -302,11 +319,14 @@ function initThemeToggle() {
 // TICK GLOBAL
 // ============================================================
 
+// Roda a cada 1 segundo para atualizar timers e verificar condições periódicas.
+// Modais de produção e fim de turno só disparam se a medição ativa
+// pertence ao usuário logado neste dispositivo.
 setInterval(() => {
   if (currentPage === 'overview') updateOverview();
   if (currentPage === 'medicao')  updateMedicao();
 
-  if (store.measurement.active) {
+  if (store.measurement.active && store.measurement.medicaoId && usuarioAtual?.nivel !== 'cliente') {
     if (store.shouldPromptProduction()) {
       vibrate([300, 100, 300, 100, 300]);
       store.measurement.lastProductionPrompt = Date.now();
