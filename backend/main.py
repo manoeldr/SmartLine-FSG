@@ -2,18 +2,30 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 from backend.database import engine, Base
-from backend.routes.medicoes import router as medicoes_router
-from backend.routes.eventos import router as eventos_router
-from backend.routes.clientes import router as clientes_router
-from backend.routes.linhas import router as linhas_router
-from backend.routes.maquinas_linha import router as maquinas_router
-from backend.routes.auth import router as auth_router
+
+# Models — devem ser importados antes das routes para o SQLAlchemy e Pydantic
+# resolverem todos os tipos corretamente
 import backend.models.medicao
 import backend.models.evento
 import backend.models.cliente
 import backend.models.linha
 import backend.models.maquina_linha
 import backend.models.usuario
+import backend.models.semiauto.wise_device
+import backend.models.semiauto.wise_channel
+import backend.models.semiauto.wise_formula
+import backend.models.semiauto.wise_raw
+
+# Routes — importadas após os models
+from backend.routes.medicoes import router as medicoes_router
+from backend.routes.eventos import router as eventos_router
+from backend.routes.clientes import router as clientes_router
+from backend.routes.linhas import router as linhas_router
+from backend.routes.maquinas_linha import router as maquinas_router
+from backend.routes.auth import router as auth_router
+from backend.routes.semiauto.wise_devices import router as wise_devices_router
+from backend.routes.semiauto.wise_channels import router as wise_channels_router
+from backend.routes.semiauto.wise_formulas import router as wise_formulas_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -73,6 +85,9 @@ app.include_router(eventos_router)
 app.include_router(clientes_router)
 app.include_router(linhas_router)
 app.include_router(maquinas_router)
+app.include_router(wise_devices_router)
+app.include_router(wise_channels_router)
+app.include_router(wise_formulas_router)
 
 @app.get("/")
 def root():

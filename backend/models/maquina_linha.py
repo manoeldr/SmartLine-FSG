@@ -20,7 +20,6 @@ class MaquinaLinha(Base):
     velocidade_nominal: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Sobrevelocidade em % acima da nominal — preenchida nas máquinas não críticas
-    # Garante que, se a crítica parar, as demais possam suprir sem criar gargalo
     sobrevelocidade: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Multiplicador aplicado sobre a velocidade nominal para calcular unidades finais
@@ -34,3 +33,9 @@ class MaquinaLinha(Base):
 
     linha: Mapped["Linha"] = relationship("Linha", back_populates="maquinas")
     medicoes: Mapped[list["Medicao"]] = relationship("Medicao", back_populates="maquina_linha")
+
+    # Dispositivos WISE vinculados a esta máquina
+    wise_devices: Mapped[list["WiseDevice"]] = relationship("WiseDevice", back_populates="maquina_linha", cascade="all, delete-orphan")
+
+    # Fórmulas de cálculo (produção, refugo) configuradas para esta máquina
+    wise_formulas: Mapped[list["WiseFormula"]] = relationship("WiseFormula", back_populates="maquina_linha", cascade="all, delete-orphan")
