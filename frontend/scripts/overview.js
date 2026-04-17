@@ -20,7 +20,6 @@ let linhaAtualId = null;
 
 const FLUXO_UPDATE_INTERVAL_MS = 30_000;
 
-// Inicializa a tela de overview.
 export async function initOverview() {
   productionChart = null;
   modalPieChart = null;
@@ -41,7 +40,6 @@ export async function initOverview() {
   lastFluxoUpdateTime = Date.now();
 }
 
-// Tenta encontrar uma linha com medição ativa para exibir no overview.
 async function detectarLinhaAtiva() {
   try {
     const medicoes = await api.listarMedicoes({});
@@ -57,7 +55,6 @@ async function detectarLinhaAtiva() {
   return null;
 }
 
-// Atualiza a tela a cada segundo (chamada pelo tick global do main.js).
 export async function updateOverview() {
   atualizarClock();
   const now = Date.now();
@@ -358,7 +355,7 @@ async function renderFluxoLinha() {
     }
 
     container.innerHTML = status.map((m, i) => {
-      const abrev = m.maquina_nome.substring(0, 4).toUpperCase();
+      const abrev = m.maquina_nome.substring(0, 3).toUpperCase();
       const estado = m.estado;
       const efText = m.eficiencia !== null ? `${m.eficiencia}%` : '—';
       const criticaStar = m.critica
@@ -406,7 +403,13 @@ async function abrirModalMaquina(maquina) {
   if (dot) dot.className = `status-dot-inline ${maquina.estado}`;
   document.getElementById('modal-maq-nome').textContent = maquina.maquina_nome;
 
-  const statusLabels = { rodando: 'Rodando', parado: 'Parada', sem_informacao: 'Sem informação', ultima_medicao: 'Última medição' };
+  // Subtítulo inicial — será atualizado com data/auditor após buscar a medição
+  const statusLabels = {
+    rodando: 'Rodando',
+    parado: 'Parada',
+    sem_informacao: 'Sem informação',
+    ultima_medicao: 'Última medição',
+  };
   document.getElementById('modal-maq-sub').textContent = statusLabels[maquina.estado] || '—';
 
   document.getElementById('modal-maq-producao').textContent = maquina.producao !== null && maquina.producao !== undefined
@@ -447,10 +450,29 @@ async function abrirModalMaquina(maquina) {
 
     if (medicoes.length > 0) {
       const medicao = medicoes[0];
+
+      // Atualiza subtítulo com data e auditor
+      const subEl = document.getElementById('modal-maq-sub');
+      if (subEl) {
+        const dataRef = medicao.timestamp_fim || medicao.timestamp_inicio;
+        const dataStr = new Date(dataRef).toLocaleDateString('pt-BR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+
+        if (maquina.estado === 'rodando' || maquina.estado === 'parado') {
+          // Medição ativa — mostra auditor
+          const auditor = medicao.usuario_nome || '—';
+          subEl.textContent = `Medindo: ${auditor} · desde ${dataStr}`;
+        } else {
+          // Última medição — mostra data
+          subEl.textContent = `${statusLabels[maquina.estado] || '—'} · ${dataStr}`;
+        }
+      }
+
       const ind = await api.indicadoresMedicao(medicao.id);
       document.getElementById('modal-maq-oee').textContent = formatPercent(ind.oee ?? 0);
       renderModalDonutFromIndicadores(ind, medicao);
-      // Passa a medição completa para incluir início e fim na timeline
       renderModalEventos(medicao.eventos || [], medicao);
     }
   } catch (e) {
@@ -539,7 +561,6 @@ function renderModalEventos(eventos, medicao) {
   const noEventos = document.getElementById('modal-maq-no-eventos');
   if (!container) return;
 
-  // Eventos sintéticos de início e fim — não vêm do backend, são gerados aqui
   const eventoInicio = {
     tipo: 'inicio',
     timestamp: medicao.timestamp_inicio,
@@ -571,7 +592,6 @@ function renderModalEventos(eventos, medicao) {
   noEventos?.classList.add('hidden');
 
   const todosCronologicos = [...relevantes].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
   const agora = new Date();
 
   const iconePorTipo = {
@@ -615,7 +635,6 @@ function renderModalEventos(eventos, medicao) {
       }
     }
 
-    // Cor do ícone por tipo
     const iconClass = ev.tipo === 'inicio' ? 'marcha' :
                       ev.tipo === 'fim' ? 'parada' : ev.tipo;
 

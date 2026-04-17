@@ -262,10 +262,6 @@ function initGlobalModals() {
     const input = document.getElementById('production-input');
     const value = parseInt(input.value);
     if (isNaN(value) || value < 0) { input.style.borderColor = 'var(--red)'; return; }
-    const lastReading = store.getLastReading();
-    if (lastReading && value < lastReading.value) {
-      if (!confirm(`Valor (${value}) menor que última leitura (${lastReading.value}). Confirma?`)) return;
-    }
     store.addProductionReading(value);
     input.value = ''; input.style.borderColor = '';
     document.getElementById('modal-production')?.classList.add('hidden');
@@ -322,6 +318,10 @@ function initThemeToggle() {
 // Roda a cada 1 segundo para atualizar timers e verificar condições periódicas.
 // Modais de produção e fim de turno só disparam se a medição ativa
 // pertence ao usuário logado neste dispositivo.
+//
+// O modal de produção usa slots fixos ancorados no início da medição:
+// slot 1 = 1º intervalo completo, slot 2 = 2º intervalo, etc.
+// Isso garante que o próximo disparo nunca se atrasa pelo tempo de resposta.
 setInterval(() => {
   if (currentPage === 'overview') updateOverview();
   if (currentPage === 'medicao')  updateMedicao();
@@ -329,8 +329,13 @@ setInterval(() => {
   if (store.measurement.active && store.measurement.medicaoId && usuarioAtual?.nivel !== 'cliente') {
     if (store.shouldPromptProduction()) {
       vibrate([300, 100, 300, 100, 300]);
-      store.measurement.lastProductionPrompt = Date.now();
+
+      // Avança o slot para o atual, sem usar Date.now() como referência
+      const intervalMs = (store.config.productionInterval || 60) * 60 * 1000;
+      const elapsed = Date.now() - new Date(store.measurement.startTime).getTime();
+      store.measurement.lastProductionSlot = Math.floor(elapsed / intervalMs);
       store.save();
+
       const lastReading = store.getLastReading();
       const input = document.getElementById('production-input');
       if (input) input.placeholder = lastReading ? `Última: ${lastReading.value}` : 'Ex: 4500';

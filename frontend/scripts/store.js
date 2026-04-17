@@ -38,6 +38,7 @@ const defaultData = () => ({
     initialProduction: null,
     productionReadings: [],
     lastProductionPrompt: null,
+    lastProductionSlot: 0,
     medicaoId: null,
     lastSyncedEventIndex: 0,
     lastSyncTime: null,
@@ -76,6 +77,8 @@ export const store = {
         if (this._data.measurement.medicaoId === undefined) this._data.measurement.medicaoId = null;
         if (this._data.measurement.lastSyncedEventIndex === undefined) this._data.measurement.lastSyncedEventIndex = 0;
         if (this._data.measurement.lastSyncTime === undefined) this._data.measurement.lastSyncTime = null;
+        // Migração: campo novo de slot fixo de produção
+        if (this._data.measurement.lastProductionSlot === undefined) this._data.measurement.lastProductionSlot = 0;
       } catch {
         this._data = defaultData();
       }
@@ -200,6 +203,11 @@ export const store = {
       m.lastSyncTime = new Date().toISOString();
       m.lastProductionPrompt = Date.now();
 
+      // Recalcula o slot atual com base no tempo já decorrido ao restaurar
+      const intervalMs = (this._data.config.productionInterval || 60) * 60 * 1000;
+      const elapsed = Date.now() - new Date(m.startTime).getTime();
+      m.lastProductionSlot = Math.floor(elapsed / intervalMs);
+
       this._data.config.machine = dados.maquina;
       this._data.config.maquinaLinhaId = dados.maquinaLinhaId;
       this._data.config.shiftStart = dados.turnoInicio;
@@ -232,6 +240,7 @@ export const store = {
     m.initialProduction = initialProduction;
     m.productionReadings = [{ time: new Date().toISOString(), value: initialProduction }];
     m.lastProductionPrompt = Date.now();
+    m.lastProductionSlot = 0;
     m.medicaoId = null;
     m.lastSyncedEventIndex = 0;
     m.lastSyncTime = null;
@@ -416,11 +425,22 @@ export const store = {
   // ============================================================
 
   // Verifica se é hora de solicitar uma nova leitura de produção.
+  // Usa slots fixos ancorados no início da medição para que o intervalo
+  // não se acumule conforme o tempo de resposta do auditor.
+  // Ex: intervalo de 60min → slot 1 dispara em 60min, slot 2 em 120min, etc.
   shouldPromptProduction() {
     const m = this._data.measurement;
     if (!m.active || m.state !== 'running') return false;
-    const interval = (this._data.config.productionInterval || 30) * 60 * 1000;
-    return Date.now() - (m.lastProductionPrompt || 0) >= interval;
+    if (!m.startTime) return false;
+
+    const intervalMs = (this._data.config.productionInterval || 60) * 60 * 1000;
+    const elapsed = Date.now() - new Date(m.startTime).getTime();
+    const currentSlot = Math.floor(elapsed / intervalMs);
+
+    if (currentSlot < 1) return false;
+
+    const lastSlot = m.lastProductionSlot || 0;
+    return currentSlot > lastSlot;
   },
 
   // Verifica se o horário de fim de turno foi atingido e ainda não foi tratado.

@@ -1,7 +1,7 @@
 // ============================================================
 // CONFIG.JS — Tela de configuração
 // Seções: Cliente, Linha, Fluxo da linha,
-// Configuração da medição (turno, intervalo de produção)
+// Configuração da medição (turno)
 // Gestão de usuários (somente admin)
 // ============================================================
 
@@ -591,7 +591,6 @@ function preencherConfigMedicao() {
   const cfg = store.config;
   document.getElementById('cfg-shift-start').value = cfg.shiftStart || '08:00';
   document.getElementById('cfg-shift-end').value = cfg.shiftEnd || '17:00';
-  document.getElementById('cfg-prod-interval').value = cfg.productionInterval || 30;
 }
 
 function configurarBotaoSalvar() {
@@ -604,7 +603,6 @@ function configurarBotaoSalvar() {
       client: document.getElementById('cfg-cliente-select')?.selectedOptions[0]?.text || store.config.client || '',
       shiftStart: document.getElementById('cfg-shift-start').value,
       shiftEnd: document.getElementById('cfg-shift-end').value,
-      productionInterval: parseInt(document.getElementById('cfg-prod-interval').value) || 30,
     });
     showToast('Configuração salva');
   });

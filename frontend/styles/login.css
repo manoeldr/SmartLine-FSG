@@ -47,7 +47,7 @@
   text-align: center;
 }
 
-.login-header h1 { color: #fff; }
+.login-header h1 { color: #ffffff; }
 .login-header p { color: rgba(255, 255, 255, 0.75); }
 
 /* Card do formulário */
@@ -98,4 +98,24 @@
   text-align: center;
   margin-top: 8px;
   font-weight: 500;
+}
+
+/* Desktop — login ocupa a tela toda sem limitação do #app */
+@media (min-width: 768px) {
+  #app:has(.page-login) {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  #page-container:has(.page-login) {
+    max-width: 100%;
+    padding: 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .login-logo img {
+    width: 200px;
+    height: 200px;
+  }
 }
