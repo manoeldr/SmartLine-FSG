@@ -69,6 +69,24 @@ if 'medicoes' in inspector.get_table_names():
             except Exception:
                 pass
 
+# Migração: usuario e senha em wise_devices
+if 'wise_devices' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('wise_devices')]
+    if 'usuario' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE wise_devices ADD COLUMN usuario VARCHAR DEFAULT 'root'"))
+                conn.commit()
+            except Exception:
+                pass
+    if 'senha' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text('ALTER TABLE wise_devices ADD COLUMN senha VARCHAR'))
+                conn.commit()
+            except Exception:
+                pass
+
 app = FastAPI()
 
 app.add_middleware(

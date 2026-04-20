@@ -1,15 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.database import get_db
-
 from backend.models.maquina_linha import MaquinaLinha
 from backend.models.semiauto.wise_device import WiseDevice
-
 from backend.schemas.semiauto.wise_device import WiseDeviceCreate, WiseDeviceUpdate, WiseDeviceResponse
 
 router = APIRouter(prefix="/linhas/{linha_id}/maquinas/{maquina_id}/wise/devices", tags=["wise_devices"])
 
 
+# ============================================================
+# HELPERS
+# ============================================================
+
+# Valida se a máquina existe e pertence à linha informada.
 def _validar_maquina(linha_id: int, maquina_id: int, db: Session) -> MaquinaLinha:
     maquina = db.query(MaquinaLinha).filter(
         MaquinaLinha.id == maquina_id,
@@ -20,6 +23,7 @@ def _validar_maquina(linha_id: int, maquina_id: int, db: Session) -> MaquinaLinh
     return maquina
 
 
+# Busca um device pelo ID e valida se pertence à máquina informada.
 def _buscar_device(maquina_id: int, device_id: int, db: Session) -> WiseDevice:
     device = db.query(WiseDevice).filter(
         WiseDevice.id == device_id,
@@ -30,7 +34,11 @@ def _buscar_device(maquina_id: int, device_id: int, db: Session) -> WiseDevice:
     return device
 
 
-# Lista todos os dispositivos WISE de uma máquina.
+# ============================================================
+# ROTAS
+# ============================================================
+
+# Lista todos os dispositivos WISE de uma máquina, ordenados por ordem.
 @router.get("/", response_model=list[WiseDeviceResponse])
 def listar_devices(linha_id: int, maquina_id: int, db: Session = Depends(get_db)):
     _validar_maquina(linha_id, maquina_id, db)
@@ -40,6 +48,7 @@ def listar_devices(linha_id: int, maquina_id: int, db: Session = Depends(get_db)
 
 
 # Cadastra um novo dispositivo WISE numa máquina.
+# Não permite cadastrar o mesmo IP duas vezes na mesma máquina.
 @router.post("/", response_model=WiseDeviceResponse)
 def criar_device(linha_id: int, maquina_id: int, dados: WiseDeviceCreate, db: Session = Depends(get_db)):
     _validar_maquina(linha_id, maquina_id, db)
@@ -58,7 +67,7 @@ def criar_device(linha_id: int, maquina_id: int, dados: WiseDeviceCreate, db: Se
     return device
 
 
-# Atualiza dados de um dispositivo WISE (IP, posição, ordem, ativo).
+# Atualiza dados de um dispositivo WISE (IP, posição, ordem, ativo, credenciais).
 @router.patch("/{device_id}", response_model=WiseDeviceResponse)
 def atualizar_device(linha_id: int, maquina_id: int, device_id: int, dados: WiseDeviceUpdate, db: Session = Depends(get_db)):
     device = _buscar_device(maquina_id, device_id, db)
@@ -70,6 +79,10 @@ def atualizar_device(linha_id: int, maquina_id: int, device_id: int, dados: Wise
         device.ordem = dados.ordem
     if dados.ativo is not None:
         device.ativo = dados.ativo
+    if dados.usuario is not None:
+        device.usuario = dados.usuario
+    if dados.senha is not None:
+        device.senha = dados.senha
     db.commit()
     db.refresh(device)
     return device
@@ -84,15 +97,22 @@ def deletar_device(linha_id: int, maquina_id: int, device_id: int, db: Session =
     return {"ok": True}
 
 
-# Testa conectividade com o WISE via REST.
-# Usado na UI para validar se o dispositivo está acessível antes de salvar.
+# Testa conectividade com o WISE via REST usando autenticação HTTP Basic.
+# Chama GET /di_value/slot_0 que retorna todos os 8 canais de uma vez.
+# Retorna ok=True com a lista de canais se o dispositivo respondeu corretamente.
 @router.get("/{device_id}/ping")
 def ping_device(linha_id: int, maquina_id: int, device_id: int, db: Session = Depends(get_db)):
     import httpx
     device = _buscar_device(maquina_id, device_id, db)
     try:
         url = f"http://{device.ip}/di_value/slot_0"
-        resp = httpx.get(url, timeout=3.0)
-        return {"ok": True, "status_code": resp.status_code, "ip": device.ip}
+        resp = httpx.get(url, timeout=10.0, auth=(device.usuario, device.senha or ""))
+        dados = resp.json()
+        canais = dados.get("DIVal", [])
+        return {
+            "ok": True,
+            "ip": device.ip,
+            "canais": canais,
+        }
     except Exception as e:
         return {"ok": False, "erro": str(e), "ip": device.ip}

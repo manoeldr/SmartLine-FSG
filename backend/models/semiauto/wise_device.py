@@ -27,5 +27,10 @@ class WiseDevice(Base):
     # Indica se este dispositivo está ativo para polling
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # Credenciais de acesso à API REST do dispositivo
+    # O WISE-4051 requer autenticação HTTP Basic para todas as requisições
+    usuario: Mapped[str] = mapped_column(String(100), default="root")
+    senha: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
     maquina_linha: Mapped["MaquinaLinha"] = relationship("MaquinaLinha", back_populates="wise_devices")
     canais: Mapped[list["WiseChannel"]] = relationship("WiseChannel", back_populates="device", cascade="all, delete-orphan")

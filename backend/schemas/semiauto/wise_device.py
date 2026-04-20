@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+﻿from pydantic import BaseModel
 from typing import Optional
 
 
@@ -7,6 +7,8 @@ class WiseDeviceCreate(BaseModel):
     posicao: str
     ordem: int = 1
     ativo: bool = True
+    usuario: str = "root"
+    senha: Optional[str] = None
 
 
 class WiseDeviceUpdate(BaseModel):
@@ -14,6 +16,8 @@ class WiseDeviceUpdate(BaseModel):
     posicao: Optional[str] = None
     ordem: Optional[int] = None
     ativo: Optional[bool] = None
+    usuario: Optional[str] = None
+    senha: Optional[str] = None
 
 
 class WiseDeviceResponse(BaseModel):
@@ -23,5 +27,7 @@ class WiseDeviceResponse(BaseModel):
     posicao: str
     ordem: int
     ativo: bool
+    usuario: str
+    senha: Optional[str] = None
 
     model_config = {"from_attributes": True}
