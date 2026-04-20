@@ -16,6 +16,16 @@ from backend.models.semiauto.wise_device import WiseDevice
 from backend.models.semiauto.wise_channel import WiseChannel
 from backend.models.semiauto.wise_raw import WiseRaw
 
+# Garante que todos os models estão registrados no SQLAlchemy
+# antes de qualquer query — necessário quando rodando em thread separada
+import backend.models.semiauto.wise_device
+import backend.models.semiauto.wise_channel
+import backend.models.semiauto.wise_formula
+import backend.models.semiauto.wise_raw
+import backend.models.maquina_linha
+import backend.models.linha
+import backend.models.cliente
+
 logger = logging.getLogger(__name__)
 
 # Intervalo entre cada rodada de polling (segundos)
