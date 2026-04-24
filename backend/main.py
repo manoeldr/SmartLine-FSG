@@ -87,6 +87,28 @@ if 'wise_devices' in inspector.get_table_names():
             except Exception:
                 pass
 
+# Migração: tempo_sem_alteracao_segundos em wise_channels
+if 'wise_channels' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('wise_channels')]
+    if 'tempo_sem_alteracao_segundos' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text('ALTER TABLE wise_channels ADD COLUMN tempo_sem_alteracao_segundos INTEGER DEFAULT 30'))
+                conn.commit()
+            except Exception:
+                pass
+
+# Migração: tipo em medicoes
+if 'medicoes' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('medicoes')]
+    if 'tipo' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text("ALTER TABLE medicoes ADD COLUMN tipo VARCHAR DEFAULT 'manual'"))
+                conn.commit()
+            except Exception:
+                pass
+
 app = FastAPI()
 
 app.add_middleware(

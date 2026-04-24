@@ -1,9 +1,10 @@
 # ============================================================
 # LAUNCHER.PY — Inicializador do SmartLine
-# Sobe três serviços em threads separadas:
+# Sobe quatro serviços em threads separadas:
 #   1. Backend FastAPI via uvicorn (porta 5000)
 #   2. Frontend via HTTP server simples (porta 5500)
-#   3. Worker de polling do WISE (thread daemon)
+#   3. Worker de polling do WISE — lê os sensores e grava wise_raw
+#   4. Worker de tratamento — processa wise_raw e gera eventos/produção
 # Ao final, abre o browser automaticamente no frontend.
 # ============================================================
 
@@ -86,21 +87,38 @@ def iniciar_frontend():
 
 
 # ============================================================
-# THREAD 3 — WISE WORKER
+# THREAD 3 — WISE WORKER (polling)
 # ============================================================
 
 def iniciar_wise_worker():
     """
     Inicia o worker de polling dos dispositivos WISE-4051.
+    Lê os sensores a cada 5 segundos e grava os dados brutos em wise_raw.
     Aguarda o backend estar pronto antes de iniciar para garantir
     que o banco de dados já foi inicializado e todas as migrações
     foram aplicadas pelo main.py.
-    O worker roda em loop infinito como thread daemon — encerra
-    automaticamente quando o processo principal for encerrado.
     """
     from backend.semiauto.wise_worker import iniciar_worker
     aguardar_backend()
     iniciar_worker()
+
+
+# ============================================================
+# THREAD 4 — WISE PROCESSOR (tratamento)
+# ============================================================
+
+def iniciar_wise_processor():
+    """
+    Inicia o worker de tratamento dos dados brutos do WISE.
+    Processa wise_raw a cada 10 segundos:
+        - Detecta paradas/marchas via canais DI
+        - Calcula produção por slot horário via counters e fórmulas
+        - Grava eventos nas medições semi-automáticas ativas
+    Aguarda o backend estar pronto antes de iniciar.
+    """
+    from backend.semiauto.wise_processor import iniciar_processor
+    aguardar_backend()
+    iniciar_processor()
 
 
 # ============================================================
@@ -111,7 +129,7 @@ def aguardar_backend(timeout=20):
     """
     Tenta conectar ao backend em loop até ele responder ou o timeout expirar.
     Retorna True se o backend respondeu, False se esgotou o tempo.
-    Usado tanto pelo launcher (para abrir o browser) quanto pelo worker
+    Usado tanto pelo launcher (para abrir o browser) quanto pelos workers
     (para garantir que o banco está pronto antes de iniciar o polling).
     """
     import urllib.request
@@ -138,14 +156,16 @@ if __name__ == '__main__':
     print('=' * 48)
     print()
 
-    # Inicia as três threads como daemon para encerrarem junto com o processo
-    t_frontend = threading.Thread(target=iniciar_frontend, daemon=True)
-    t_backend  = threading.Thread(target=iniciar_backend,  daemon=True)
-    t_worker   = threading.Thread(target=iniciar_wise_worker, daemon=True)
+    # Inicia as quatro threads como daemon para encerrarem junto com o processo
+    t_frontend  = threading.Thread(target=iniciar_frontend,       daemon=True)
+    t_backend   = threading.Thread(target=iniciar_backend,        daemon=True)
+    t_worker    = threading.Thread(target=iniciar_wise_worker,    daemon=True)
+    t_processor = threading.Thread(target=iniciar_wise_processor, daemon=True)
 
     t_frontend.start()
     t_backend.start()
     t_worker.start()
+    t_processor.start()
 
     # Aguarda o backend estar pronto antes de abrir o browser
     print('Aguardando backend iniciar...')

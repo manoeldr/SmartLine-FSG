@@ -2,9 +2,11 @@
 # CALCULATIONS.PY — Cálculos de indicadores de produção
 # Fonte única de verdade para OEE, MTBF, MTTR, disponibilidade,
 # performance e eficiência. Usado por routes e endpoints.
+# Inclui também os cálculos específicos da medição semi-automática
+# via WISE-4051: delta de counter, detecção de parada por DI.
 # ============================================================
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 
@@ -123,7 +125,6 @@ def calcular_paradas_por_motivo(eventos: list, timestamp_fim: Optional[datetime]
         if ev.tipo != "parada":
             continue
         motivo = ev.motivo or "Não informado"
-        # Próximo evento de marcha após esta parada
         prox_marcha = next(
             (e for j, e in enumerate(eventos) if j > i and e.tipo == "marcha"),
             None
@@ -147,3 +148,108 @@ def calcular_paradas_por_motivo(eventos: list, timestamp_fim: Optional[datetime]
         }
         for motivo, data in sorted(by_motivo.items(), key=lambda x: -x[1]["total_ms"])
     ]
+
+
+# ============================================================
+# CÁLCULOS SEMI-AUTOMÁTICO — WISE-4051
+# ============================================================
+
+def calcular_delta_counter(
+    valor_atual: float,
+    valor_anterior: float,
+) -> Optional[float]:
+    """
+    Calcula o delta de um canal Counter entre dois polls.
+
+    Se o delta for negativo (reset ou overflow do contador no WISE),
+    retorna None para indicar que este intervalo deve ser ignorado.
+
+    Parâmetros:
+        valor_atual: valor acumulado lido no poll atual
+        valor_anterior: valor acumulado lido no poll anterior
+
+    Retorna o delta positivo ou None se inválido.
+    """
+    delta = valor_atual - valor_anterior
+    if delta < 0:
+        return None
+    return delta
+
+
+def aplicar_formula(
+    operacoes: list[dict],
+    deltas_por_posicao: dict[str, float],
+) -> Optional[float]:
+    """
+    Aplica uma fórmula de cálculo (produção ou refugo) usando os deltas
+    dos counters de cada posição configurada.
+
+    Parâmetros:
+        operacoes: lista de dicts com "posicao" e "operacao" (+ ou -)
+                   Ex: [{"posicao": "saida", "operacao": "+"}, {"posicao": "inspetor", "operacao": "-"}]
+        deltas_por_posicao: dict com o delta calculado para cada posição
+                   Ex: {"saida": 1500.0, "inspetor": 45.0}
+
+    Retorna o resultado da fórmula ou None se alguma posição estiver ausente.
+    """
+    resultado = 0.0
+    for op in operacoes:
+        posicao = op.get("posicao")
+        operacao = op.get("operacao", "+")
+        delta = deltas_por_posicao.get(posicao)
+        if delta is None:
+            return None
+        if operacao == "+":
+            resultado += delta
+        elif operacao == "-":
+            resultado -= delta
+    return max(0.0, resultado)  # produção nunca negativa
+
+
+def detectar_estado_di(
+    leituras_recentes: list[dict],
+    tempo_sem_alteracao_segundos: int,
+    agora: Optional[datetime] = None,
+) -> Optional[str]:
+    """
+    Detecta o estado da máquina com base nas leituras recentes de um canal DI.
+
+    O canal DI é um sensor de passagem de produto — alterna entre 0 e 1
+    conforme produtos passam. Se o sinal ficar estático (sem alternar)
+    por tempo_sem_alteracao_segundos, considera parada.
+
+    Parâmetros:
+        leituras_recentes: lista de dicts com "valor" e "timestamp" (datetime),
+                           ordenados cronologicamente (mais antigo primeiro)
+        tempo_sem_alteracao_segundos: threshold de tempo sem alteração para parada
+        agora: datetime atual (None = datetime.now())
+
+    Retorna:
+        "rodando"  — sinal alternando normalmente
+        "parado"   — sinal estático por mais de tempo_sem_alteracao_segundos
+        None       — sem leituras suficientes para determinar
+    """
+    if not leituras_recentes:
+        return None
+
+    agora = agora or datetime.now()
+    threshold = timedelta(seconds=tempo_sem_alteracao_segundos)
+
+    # Percorre as leituras de trás para frente procurando a última alteração
+    ultima_alteracao = None
+    valor_ref = leituras_recentes[-1]["valor"]
+
+    for leitura in reversed(leituras_recentes):
+        if leitura["valor"] != valor_ref:
+            ultima_alteracao = leitura["timestamp"]
+            break
+
+    # Se nunca alterou, usa o timestamp da primeira leitura disponível
+    if ultima_alteracao is None:
+        ultima_alteracao = leituras_recentes[0]["timestamp"]
+
+    tempo_estatico = agora - ultima_alteracao
+
+    if tempo_estatico >= threshold:
+        return "parado"
+    return "rodando"

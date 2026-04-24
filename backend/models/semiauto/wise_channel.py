@@ -12,9 +12,12 @@ from backend.database import Base
 #   "Counter" — contador acumulado de pulsos
 #
 # Funções possíveis:
-#   "marcha_parada" — DI: 1 = rodando, 0 = parado
+#   "marcha_parada" — DI: sensor de passagem de produto.
+#                     Se o sinal não alternar por tempo_sem_alteracao_segundos → parada.
+#                     Quando voltar a alternar → marcha.
 #   "contagem"      — Counter: usado nas fórmulas de produção/refugo
 #   "alarme"        — DI: quando vai para 1 gera evento de alarme com o motivo definido
+
 class WiseChannel(Base):
     __tablename__ = "wise_channels"
 
@@ -35,6 +38,13 @@ class WiseChannel(Base):
     # Usado apenas quando funcao = "alarme"
     # Nome/motivo do alarme que será registrado no evento
     alarme_motivo: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+    # Usado apenas quando funcao = "marcha_parada"
+    # Define quantos segundos o sinal precisa ficar estático (sem alternar entre 0 e 1)
+    # para que o worker considere a máquina como parada.
+    # Exemplo: se tempo_sem_alteracao_segundos = 30, e o sinal fica em 0 ou 1
+    # por 30 segundos sem mudar, gera evento de parada.
+    tempo_sem_alteracao_segundos: Mapped[int | None] = mapped_column(Integer, nullable=True, default=30)
 
     # Indica se este canal está ativo para leitura
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
