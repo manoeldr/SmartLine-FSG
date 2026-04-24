@@ -3,6 +3,10 @@
 // Seções: Cliente, Linha, Fluxo da linha,
 // Configuração da medição (turno)
 // Gestão de usuários (somente admin)
+// Modal de máquina: seletor Manual / Semi Automático / Automático
+//   - Manual: velocidade, sobrevelocidade, multiplicador, crítica, alarmes
+//   - Semi Automático: velocidade, sobrevelocidade, multiplicador, crítica + WISE
+//   - Automático: bloqueado (futuro)
 // ============================================================
 
 import { store } from './store.js';
@@ -235,7 +239,6 @@ function configurarBotaoAdicionarMaquina() {
 }
 
 // Renderiza a lista de máquinas com drag-and-drop para reordenação.
-// Suporta tanto mouse (desktop) quanto touch (mobile).
 function renderMaquinas() {
   const list = document.getElementById('cfg-maquinas-list');
   if (estadoConfig.maquinas.length === 0) {
@@ -294,33 +297,24 @@ function renderMaquinas() {
     });
   });
 
-  // ── Drag and drop com suporte a touch ───────────────────
+  // ── Drag and drop ────────────────────────────────────────
   let dragging = null;
   let dragClone = null;
   let offsetY = 0;
 
-  // Salva nova ordem no backend após reordenação
   async function salvarNovaOrdem() {
     const items = [...list.querySelectorAll('.maquina-item')];
-    const novaOrdem = items.map((el, i) => ({
-      id: parseInt(el.dataset.id),
-      ordem: i + 1,
-    }));
+    const novaOrdem = items.map((el, i) => ({ id: parseInt(el.dataset.id), ordem: i + 1 }));
     novaOrdem.forEach(({ id, ordem }) => {
       const m = estadoConfig.maquinas.find(m => m.id === id);
       if (m) m.ordem = ordem;
     });
     estadoConfig.maquinas.sort((a, b) => a.ordem - b.ordem);
     try {
-      await Promise.all(
-        novaOrdem.map(({ id, ordem }) =>
-          api.atualizarMaquina(estadoConfig.linhaId, id, { ordem })
-        )
-      );
+      await Promise.all(novaOrdem.map(({ id, ordem }) => api.atualizarMaquina(estadoConfig.linhaId, id, { ordem })));
       renderMaquinas();
       showToast('Ordem salva');
-    } catch (err) {
-      console.error('Erro ao salvar ordem:', err);
+    } catch {
       showToast('Erro ao salvar nova ordem', 'erro');
     }
   }
@@ -328,54 +322,23 @@ function renderMaquinas() {
   list.querySelectorAll('.maquina-item').forEach(item => {
     const handle = item.querySelector('.drag-handle');
 
-    // Desktop — drag nativo
-    item.addEventListener('dragstart', (e) => {
-      dragging = item;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-
-    item.addEventListener('dragend', async () => {
-      item.classList.remove('dragging');
-      dragging = null;
-      await salvarNovaOrdem();
-    });
-
+    item.addEventListener('dragstart', (e) => { dragging = item; item.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+    item.addEventListener('dragend', async () => { item.classList.remove('dragging'); dragging = null; await salvarNovaOrdem(); });
     item.addEventListener('dragover', (e) => {
       e.preventDefault();
       if (dragging && dragging !== item) {
         const rect = item.getBoundingClientRect();
-        const mid = rect.top + rect.height / 2;
-        if (e.clientY < mid) {
-          list.insertBefore(dragging, item);
-        } else {
-          list.insertBefore(dragging, item.nextSibling);
-        }
+        list.insertBefore(dragging, e.clientY < rect.top + rect.height / 2 ? item : item.nextSibling);
       }
     });
 
-    // Mobile — touch
     handle.addEventListener('touchstart', (e) => {
       e.preventDefault();
       dragging = item;
       item.classList.add('dragging');
-
-      // Clone visual que segue o dedo
       dragClone = item.cloneNode(true);
       const rect = item.getBoundingClientRect();
-      dragClone.style.cssText = `
-        position: fixed;
-        z-index: 9999;
-        width: ${rect.width}px;
-        left: ${rect.left}px;
-        opacity: 0.9;
-        pointer-events: none;
-        background: var(--bg-card);
-        border: 1.5px solid var(--brand);
-        border-radius: var(--radius-sm);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-        padding: 12px 4px;
-      `;
+      dragClone.style.cssText = `position:fixed;z-index:9999;width:${rect.width}px;left:${rect.left}px;opacity:0.9;pointer-events:none;background:var(--bg-card);border:1.5px solid var(--brand);border-radius:var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.2);padding:12px 4px;`;
       const touch = e.touches[0];
       offsetY = touch.clientY - rect.top;
       dragClone.style.top = `${touch.clientY - offsetY}px`;
@@ -387,21 +350,13 @@ function renderMaquinas() {
       if (!dragging || !dragClone) return;
       const touch = e.touches[0];
       dragClone.style.top = `${touch.clientY - offsetY}px`;
-
-      // Detecta item sob o dedo
       dragClone.style.display = 'none';
       const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
       dragClone.style.display = '';
-
       const targetItem = elBelow?.closest('.maquina-item');
       if (targetItem && targetItem !== dragging) {
         const rect = targetItem.getBoundingClientRect();
-        const mid = rect.top + rect.height / 2;
-        if (touch.clientY < mid) {
-          list.insertBefore(dragging, targetItem);
-        } else {
-          list.insertBefore(dragging, targetItem.nextSibling);
-        }
+        list.insertBefore(dragging, touch.clientY < rect.top + rect.height / 2 ? targetItem : targetItem.nextSibling);
       }
     }, { passive: false });
 
@@ -425,35 +380,61 @@ function limparMaquinas() {
 // MODAL: CONFIGURAR MÁQUINA
 // ============================================================
 
-function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, multiplicador = 1, critica = false, alarmes) {
+async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, multiplicador = 1, critica = false, alarmes) {
   document.getElementById('modal-config-maquina')?.remove();
+
+  // Carrega devices WISE existentes para detectar o tipo atual
+  let wiseDevices = [];
+  try { wiseDevices = await api.listarWiseDevices(estadoConfig.linhaId, maquinaId); } catch { }
+
+  const tipoAtual = wiseDevices.length > 0 ? 'semiautomatico' : 'manual';
 
   const modal = document.createElement('div');
   modal.id = 'modal-config-maquina';
   modal.className = 'modal-overlay';
   modal.innerHTML = `
-    <div class="modal">
+    <div class="modal" style="max-width:560px;">
       <h3>${nome}</h3>
       <p class="modal-sub">Configuração específica desta máquina</p>
 
+      <!-- Seletor de tipo de medição -->
+      <div style="margin-bottom:20px;">
+        <label style="font-size:0.75rem;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;display:block;margin-bottom:10px;">Tipo de medição</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <button type="button" class="cfg-tipo-btn ${tipoAtual === 'manual' ? 'active' : ''}" data-tipo="manual">
+            <span style="font-size:1.25rem;display:block;margin-bottom:2px;">📱</span>
+            <span style="font-size:0.8rem;font-weight:600;display:block;">Manual</span>
+            <span style="font-size:0.7rem;color:inherit;opacity:0.75;display:block;">Pelo celular</span>
+          </button>
+          <button type="button" class="cfg-tipo-btn ${tipoAtual === 'semiautomatico' ? 'active' : ''}" data-tipo="semiautomatico">
+            <span style="font-size:1.25rem;display:block;margin-bottom:2px;">📡</span>
+            <span style="font-size:0.8rem;font-weight:600;display:block;">Semi Auto</span>
+            <span style="font-size:0.7rem;color:inherit;opacity:0.75;display:block;">Via IOT</span>
+          </button>
+          <button type="button" class="cfg-tipo-btn cfg-tipo-btn--disabled" data-tipo="automatico" disabled title="Em breve">
+            <span style="font-size:1.25rem;display:block;margin-bottom:2px;">🔌</span>
+            <span style="font-size:0.8rem;font-weight:600;display:block;">Automático</span>
+            <span style="font-size:0.7rem;color:inherit;opacity:0.75;display:block;">Em breve</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Campos comuns -->
       <div class="form-group">
         <label>Velocidade nominal (unidades/hora) <span style="color:var(--red)">*</span></label>
         <input type="number" id="modal-maq-velocidade" class="input" placeholder="Ex: 12000" value="${velocidade}" inputmode="numeric">
         <p class="modal-sub" style="margin-top:4px;">Velocidade de operação padrão da máquina.</p>
       </div>
-
       <div class="form-group">
         <label>Sobrevelocidade (% acima da nominal) <span style="color:var(--red)">*</span></label>
-        <input type="number" step="0.1" min="0" id="modal-maq-sobrevelocidade" class="input" placeholder="Ex: 10 (significa 10% acima)" value="${sobrevelocidade}" inputmode="numeric">
+        <input type="number" step="0.1" min="0" id="modal-maq-sobrevelocidade" class="input" placeholder="Ex: 10" value="${sobrevelocidade}" inputmode="numeric">
         <p class="modal-sub" style="margin-top:4px;">Velocidade máxima para compensar paradas na linha.</p>
       </div>
-
       <div class="form-group">
         <label>Multiplicador de produto</label>
-        <input type="number" step="0.01" min="0.01" id="modal-maq-multiplicador" class="input" placeholder="Ex: 24 (garrafas por caixa)" value="${multiplicador}">
+        <input type="number" step="0.01" min="0.01" id="modal-maq-multiplicador" class="input" placeholder="Ex: 24" value="${multiplicador}">
         <p class="modal-sub" style="margin-top:4px;">Aplicado sobre a velocidade para cálculo de unidades finais.</p>
       </div>
-
       <div class="theme-toggle-row" style="margin-bottom:16px;">
         <div class="theme-toggle-info">
           <span class="theme-toggle-label">Máquina crítica</span>
@@ -467,39 +448,94 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
         </button>
       </div>
 
-      <div class="form-group">
-        <label>Alarmes / motivos de parada</label>
-        <div id="modal-maq-alarm-list" style="margin-bottom:8px;"></div>
-        <div class="form-row">
-          <input type="text" id="modal-maq-new-alarm" class="input flex-1" placeholder="Novo alarme...">
-          <select id="modal-maq-new-alarm-cat" class="input" style="width:auto;min-width:100px">
-            <option value="Interna">Interna</option>
-            <option value="Externa">Externa</option>
-          </select>
-          <button type="button" class="btn btn-sm" id="modal-maq-add-alarm">+</button>
+      <!-- Seção Manual: alarmes -->
+      <div id="cfg-secao-alarmes">
+        <div class="form-group">
+          <label>Alarmes / motivos de parada</label>
+          <div id="modal-maq-alarm-list" style="margin-bottom:8px;"></div>
+          <div class="form-row">
+            <input type="text" id="modal-maq-new-alarm" class="input flex-1" placeholder="Novo alarme...">
+            <select id="modal-maq-new-alarm-cat" class="input" style="width:auto;min-width:100px">
+              <option value="Interna">Interna</option>
+              <option value="Externa">Externa</option>
+            </select>
+            <button type="button" class="btn btn-sm" id="modal-maq-add-alarm">+</button>
+          </div>
         </div>
       </div>
 
-      <button type="button" class="btn btn-primary btn-block" id="modal-maq-salvar" style="margin-top:8px;">Salvar</button>
+      <!-- Seção Semi Auto: WISE -->
+      <div id="cfg-secao-wise" class="hidden">
+        <div style="border-top:1px solid var(--border);margin:8px 0 16px;"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div>
+            <p style="font-size:0.875rem;font-weight:600;color:var(--text);margin:0;">Dispositivos WISE</p>
+            <p class="modal-sub" style="margin:2px 0 0;">Sensores IOT conectados a esta máquina</p>
+          </div>
+          <button type="button" class="btn btn-sm" id="btn-wise-add-device">+ Adicionar</button>
+        </div>
+        <div id="wise-devices-list"></div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0 10px;"></div>
+        <div style="margin-bottom:10px;">
+          <p style="font-size:0.875rem;font-weight:600;color:var(--text);margin:0 0 2px;">Fórmulas de cálculo</p>
+          <p class="modal-sub" style="margin:0;">Defina como calcular produção e refugo</p>
+        </div>
+        <div id="wise-formulas-list"></div>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-wise-add-formula" style="margin-top:8px;width:100%;">+ Adicionar fórmula</button>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-block" id="modal-maq-salvar" style="margin-top:16px;">Salvar</button>
       <button type="button" class="btn btn-outline btn-block" id="modal-maq-cancelar" style="margin-top:8px;">Cancelar</button>
     </div>
   `;
   document.body.appendChild(modal);
 
+  // ── Estado interno ────────────────────────────────────────
+  let tipoSelecionado = tipoAtual;
   let criticaAtual = critica;
-  const toggle = document.getElementById('modal-maq-critica-toggle');
-  const label = document.getElementById('modal-maq-critica-label');
+  let alarmesList = [...alarmes];
+  let devicesWise = [...wiseDevices];
+  let formulasWise = [];
+  try { formulasWise = await api.listarWiseFormulas(estadoConfig.linhaId, maquinaId); } catch { }
 
-  toggle.addEventListener('click', () => {
+  // ── Toggle crítica ────────────────────────────────────────
+  const toggleCritica = document.getElementById('modal-maq-critica-toggle');
+  const labelCritica = document.getElementById('modal-maq-critica-label');
+  toggleCritica.addEventListener('click', () => {
     criticaAtual = !criticaAtual;
-    toggle.classList.toggle('active', criticaAtual);
-    label.textContent = criticaAtual ? 'Sim' : 'Não';
+    toggleCritica.classList.toggle('active', criticaAtual);
+    labelCritica.textContent = criticaAtual ? 'Sim' : 'Não';
   });
 
-  let alarmesList = [...alarmes];
+  // ── Seletor de tipo ───────────────────────────────────────
+  function atualizarVisibilidade() {
+    const secaoAlarmes = document.getElementById('cfg-secao-alarmes');
+    const secaoWise = document.getElementById('cfg-secao-wise');
+    if (tipoSelecionado === 'manual') {
+      secaoAlarmes.classList.remove('hidden');
+      secaoWise.classList.add('hidden');
+    } else if (tipoSelecionado === 'semiautomatico') {
+      secaoAlarmes.classList.add('hidden');
+      secaoWise.classList.remove('hidden');
+      renderWiseDevices();
+      renderWiseFormulas();
+    }
+  }
 
+  modal.querySelectorAll('.cfg-tipo-btn:not(.cfg-tipo-btn--disabled)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      tipoSelecionado = btn.dataset.tipo;
+      modal.querySelectorAll('.cfg-tipo-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      atualizarVisibilidade();
+    });
+  });
+
+  // ── Alarmes ───────────────────────────────────────────────
   function renderAlarmesList() {
     const list = document.getElementById('modal-maq-alarm-list');
+    if (!list) return;
     if (alarmesList.length === 0) {
       list.innerHTML = '<p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:8px;">Nenhum alarme cadastrado</p>';
       return;
@@ -517,10 +553,9 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
       });
     });
   }
-
   renderAlarmesList();
 
-  document.getElementById('modal-maq-add-alarm').addEventListener('click', () => {
+  document.getElementById('modal-maq-add-alarm')?.addEventListener('click', () => {
     const input = document.getElementById('modal-maq-new-alarm');
     const cat = document.getElementById('modal-maq-new-alarm-cat').value;
     const nomeAlarme = input.value.trim();
@@ -532,55 +567,422 @@ function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, m
     input.value = '';
   });
 
-  document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
-    const velocidadeRaw = document.getElementById('modal-maq-velocidade').value.trim();
-    const velocidadeVal = velocidadeRaw !== '' ? parseFloat(velocidadeRaw) : null;
-    const sobrevelocidadeRaw = document.getElementById('modal-maq-sobrevelocidade').value.trim();
-    const sobrevelocidadeVal = sobrevelocidadeRaw !== '' ? parseFloat(sobrevelocidadeRaw) : null;
-    const multiplicadorVal = parseFloat(document.getElementById('modal-maq-multiplicador').value) || 1;
-
-    if (!velocidadeVal || sobrevelocidadeVal === null || sobrevelocidadeVal === undefined) {
-      if (!velocidadeVal) document.getElementById('modal-maq-velocidade').style.borderColor = 'var(--red)';
-      if (sobrevelocidadeVal === null || sobrevelocidadeVal === undefined) {
-        document.getElementById('modal-maq-sobrevelocidade').style.borderColor = 'var(--red)';
-      }
-      showToast('Velocidade nominal e Sobrevelocidade são obrigatórios', 'erro');
+  // ── WISE Devices ──────────────────────────────────────────
+  function renderWiseDevices() {
+    const container = document.getElementById('wise-devices-list');
+    if (!container) return;
+    if (devicesWise.length === 0) {
+      container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-dim);text-align:center;padding:8px 0;">Nenhum dispositivo cadastrado</p>';
       return;
     }
+    container.innerHTML = devicesWise.map(d => `
+      <div class="wise-device-item" data-id="${d.id}" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div>
+            <span style="font-size:0.875rem;font-weight:600;color:var(--text);">${d.posicao}</span>
+            <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">${d.ip}</span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button type="button" class="btn-wise-ping btn btn-sm" data-id="${d.id}" style="padding:4px 8px;font-size:0.75rem;">📡 Ping</button>
+            <button type="button" class="btn-wise-channels btn btn-sm" data-id="${d.id}" style="padding:4px 8px;font-size:0.75rem;">Canais</button>
+            <button type="button" class="btn-wise-delete btn-icon" data-id="${d.id}" style="color:var(--red);">×</button>
+          </div>
+        </div>
+        <div class="wise-ping-result" data-id="${d.id}" style="display:none;font-size:0.75rem;"></div>
+        <div class="wise-channels-panel" data-id="${d.id}" style="display:none;margin-top:8px;"></div>
+      </div>
+    `).join('');
+
+    // Ping
+    container.querySelectorAll('.btn-wise-ping').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const deviceId = parseInt(btn.dataset.id);
+        const resultEl = container.querySelector(`.wise-ping-result[data-id="${deviceId}"]`);
+        resultEl.style.display = 'block';
+        resultEl.style.color = 'var(--text-dim)';
+        resultEl.textContent = 'Testando...';
+        try {
+          const res = await api.pingWiseDevice(estadoConfig.linhaId, maquinaId, deviceId);
+          if (res.ok) {
+            resultEl.textContent = `✓ Conectado — ${res.canais?.length || 0} canais lidos`;
+            resultEl.style.color = 'var(--green)';
+          } else {
+            resultEl.textContent = `✗ Falha: ${res.erro || 'sem resposta'}`;
+            resultEl.style.color = 'var(--red)';
+          }
+        } catch {
+          resultEl.textContent = '✗ Erro ao conectar';
+          resultEl.style.color = 'var(--red)';
+        }
+      });
+    });
+
+    // Canais
+    container.querySelectorAll('.btn-wise-channels').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const deviceId = parseInt(btn.dataset.id);
+        const panel = container.querySelector(`.wise-channels-panel[data-id="${deviceId}"]`);
+        if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+        panel.style.display = 'block';
+        panel.innerHTML = '<p style="font-size:0.75rem;color:var(--text-dim);">Carregando...</p>';
+        try {
+          const canais = await api.listarWiseChannels(estadoConfig.linhaId, maquinaId, deviceId);
+          renderWiseChannels(panel, deviceId, canais);
+        } catch {
+          panel.innerHTML = '<p style="font-size:0.75rem;color:var(--red);">Erro ao carregar canais</p>';
+        }
+      });
+    });
+
+    // Deletar device
+    container.querySelectorAll('.btn-wise-delete').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const deviceId = parseInt(btn.dataset.id);
+        if (!confirm('Remover este dispositivo e todos os seus canais?')) return;
+        try {
+          await api.deletarWiseDevice(estadoConfig.linhaId, maquinaId, deviceId);
+          devicesWise = devicesWise.filter(d => d.id !== deviceId);
+          renderWiseDevices();
+          showToast('Dispositivo removido');
+        } catch {
+          showToast('Erro ao remover dispositivo', 'erro');
+        }
+      });
+    });
+  }
+
+  // ── WISE Channels ─────────────────────────────────────────
+  function renderWiseChannels(panel, deviceId, canais) {
+    const funcaoLabel = { marcha_parada: 'Marcha/Parada', contagem: 'Contagem', alarme: 'Alarme' };
+    panel.innerHTML = `
+      <div style="border-top:1px solid var(--border);padding-top:8px;">
+        <p style="font-size:0.7rem;font-weight:600;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Canais configurados</p>
+        ${canais.length === 0
+          ? '<p style="font-size:0.75rem;color:var(--text-dim);">Nenhum canal cadastrado</p>'
+          : canais.map(c => `
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">
+              <span style="font-size:0.75rem;font-weight:700;color:var(--text-dim);min-width:18px;">${c.numero_canal}</span>
+              <span style="font-size:0.8rem;color:var(--text);flex:1;">${c.tipo} — ${funcaoLabel[c.funcao] || c.funcao}</span>
+              ${c.funcao === 'marcha_parada' || c.funcao === 'contagem' ? `<span style="font-size:0.7rem;color:var(--text-dim);">${c.tempo_sem_alteracao_segundos}s</span>` : ''}
+              ${c.alarme_motivo ? `<span style="font-size:0.7rem;color:var(--amber);">${c.alarme_motivo}</span>` : ''}
+              <button type="button" class="btn-del-channel btn-icon" data-device="${deviceId}" data-channel="${c.id}" style="color:var(--red);">×</button>
+            </div>
+          `).join('')}
+        <div style="margin-top:10px;">
+          <p style="font-size:0.7rem;font-weight:600;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Novo canal</p>
+          <div style="display:grid;grid-template-columns:60px 1fr 1fr;gap:6px;margin-bottom:6px;">
+            <input type="number" class="input ch-numero" placeholder="Canal" min="0" max="7" style="font-size:0.8rem;padding:6px;">
+            <select class="input ch-tipo" style="font-size:0.8rem;padding:6px;">
+              <option value="DI">DI</option>
+              <option value="Counter">Counter</option>
+            </select>
+            <select class="input ch-funcao" style="font-size:0.8rem;padding:6px;">
+              <option value="contagem">Contagem</option>
+              <option value="marcha_parada">Marcha/Parada</option>
+              <option value="alarme">Alarme</option>
+            </select>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 80px;gap:6px;margin-bottom:6px;">
+            <input type="text" class="input ch-motivo" placeholder="Motivo (somente alarme)" style="font-size:0.8rem;padding:6px;">
+            <input type="number" class="input ch-threshold" value="30" style="font-size:0.8rem;padding:6px;" title="Segundos sem alteração para considerar parada">
+          </div>
+          <button type="button" class="btn btn-sm btn-primary btn-add-channel" data-device="${deviceId}" style="width:100%;">+ Adicionar canal</button>
+        </div>
+      </div>
+    `;
+
+    panel.querySelectorAll('.btn-del-channel').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        try {
+          await api.deletarWiseChannel(estadoConfig.linhaId, maquinaId, parseInt(btn.dataset.device), parseInt(btn.dataset.channel));
+          const novos = await api.listarWiseChannels(estadoConfig.linhaId, maquinaId, parseInt(btn.dataset.device));
+          renderWiseChannels(panel, parseInt(btn.dataset.device), novos);
+          showToast('Canal removido');
+        } catch { showToast('Erro ao remover canal', 'erro'); }
+      });
+    });
+
+    panel.querySelector('.btn-add-channel')?.addEventListener('click', async () => {
+      const numero = parseInt(panel.querySelector('.ch-numero').value);
+      const tipo = panel.querySelector('.ch-tipo').value;
+      const funcao = panel.querySelector('.ch-funcao').value;
+      const motivo = panel.querySelector('.ch-motivo').value.trim();
+      const threshold = parseInt(panel.querySelector('.ch-threshold').value) || 30;
+      if (isNaN(numero)) { showToast('Informe o número do canal', 'erro'); return; }
+      if (funcao === 'alarme' && !motivo) { showToast('Informe o motivo do alarme', 'erro'); return; }
+      try {
+        await api.criarWiseChannel(estadoConfig.linhaId, maquinaId, deviceId, {
+          numero_canal: numero, tipo, funcao,
+          alarme_motivo: funcao === 'alarme' ? motivo : null,
+          tempo_sem_alteracao_segundos: threshold,
+          ativo: true,
+        });
+        const novos = await api.listarWiseChannels(estadoConfig.linhaId, maquinaId, deviceId);
+        renderWiseChannels(panel, deviceId, novos);
+        showToast('Canal adicionado');
+      } catch (err) { showToast(err.message || 'Erro ao adicionar canal', 'erro'); }
+    });
+  }
+
+  // ── WISE Formulas ─────────────────────────────────────────
+  function renderWiseFormulas() {
+    const container = document.getElementById('wise-formulas-list');
+    if (!container) return;
+    const resultadoLabel = { producao: 'Produção', refugo: 'Refugo' };
+    if (formulasWise.length === 0) {
+      container.innerHTML = '<p style="font-size:0.8rem;color:var(--text-dim);text-align:center;padding:4px 0 8px;">Nenhuma fórmula configurada</p>';
+    } else {
+      container.innerHTML = formulasWise.map(f => {
+        let ops = [];
+        try { ops = JSON.parse(f.operacoes); } catch { }
+        const expr = ops.map((o, i) => `${i > 0 ? (o.operacao === '-' ? ' − ' : ' + ') : ''}${o.posicao}`).join('');
+        return `
+          <div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;">
+            <span style="font-size:0.8rem;font-weight:600;color:var(--brand);min-width:64px;">${resultadoLabel[f.resultado] || f.resultado}</span>
+            <span style="font-size:0.8rem;color:var(--text);flex:1;font-family:monospace;">${expr}</span>
+            <button type="button" class="btn-del-formula btn-icon" data-id="${f.id}" style="color:var(--red);">×</button>
+          </div>
+        `;
+      }).join('');
+      container.querySelectorAll('.btn-del-formula').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            await api.deletarWiseFormula(estadoConfig.linhaId, maquinaId, parseInt(btn.dataset.id));
+            formulasWise = formulasWise.filter(f => f.id !== parseInt(btn.dataset.id));
+            renderWiseFormulas();
+            showToast('Fórmula removida');
+          } catch { showToast('Erro ao remover fórmula', 'erro'); }
+        });
+      });
+    }
+  }
+
+  // Adicionar device
+  document.getElementById('btn-wise-add-device')?.addEventListener('click', () => {
+    abrirModalAdicionarDevice(maquinaId, async (novoDevice) => {
+      devicesWise.push(novoDevice);
+      renderWiseDevices();
+    });
+  });
+
+  // Adicionar fórmula
+  document.getElementById('btn-wise-add-formula')?.addEventListener('click', () => {
+    const posicoes = [...new Set(devicesWise.map(d => d.posicao))];
+    if (posicoes.length === 0) { showToast('Cadastre ao menos um dispositivo WISE antes de criar fórmulas', 'erro'); return; }
+    abrirModalAdicionarFormula(maquinaId, posicoes, async (novaFormula) => {
+      formulasWise = formulasWise.filter(f => f.resultado !== novaFormula.resultado);
+      formulasWise.push(novaFormula);
+      renderWiseFormulas();
+    });
+  });
+
+  atualizarVisibilidade();
+
+  // ── Salvar ────────────────────────────────────────────────
+  document.getElementById('modal-maq-salvar').addEventListener('click', async () => {
+    const velocidadeVal = document.getElementById('modal-maq-velocidade').value.trim() !== '' ? parseFloat(document.getElementById('modal-maq-velocidade').value) : null;
+    const sobrevelocidadeVal = document.getElementById('modal-maq-sobrevelocidade').value.trim() !== '' ? parseFloat(document.getElementById('modal-maq-sobrevelocidade').value) : null;
+    const multiplicadorVal = parseFloat(document.getElementById('modal-maq-multiplicador').value) || 1;
+
+    if (!velocidadeVal) { document.getElementById('modal-maq-velocidade').style.borderColor = 'var(--red)'; showToast('Velocidade nominal e Sobrevelocidade são obrigatórios', 'erro'); return; }
+    if (sobrevelocidadeVal === null) { document.getElementById('modal-maq-sobrevelocidade').style.borderColor = 'var(--red)'; showToast('Velocidade nominal e Sobrevelocidade são obrigatórios', 'erro'); return; }
 
     document.getElementById('modal-maq-velocidade').style.borderColor = '';
     document.getElementById('modal-maq-sobrevelocidade').style.borderColor = '';
 
     try {
-      await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, {
+      const dadosSalvar = {
         velocidade_nominal: velocidadeVal,
         sobrevelocidade: sobrevelocidadeVal,
         multiplicador_produto: multiplicadorVal,
         critica: criticaAtual,
-        alarmes: JSON.stringify(alarmesList),
-      });
+        ...(tipoSelecionado === 'manual' && { alarmes: JSON.stringify(alarmesList) }),
+      };
+      await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, dadosSalvar);
       const m = estadoConfig.maquinas.find(m => m.id === maquinaId);
       if (m) {
-        m.velocidade_nominal = velocidadeVal;
-        m.sobrevelocidade = sobrevelocidadeVal;
-        m.multiplicador_produto = multiplicadorVal;
-        m.critica = criticaAtual;
-        m.alarmes = JSON.stringify(alarmesList);
-        if (criticaAtual) {
-          estadoConfig.maquinas.forEach(maq => {
-            if (maq.id !== maquinaId) maq.critica = false;
-          });
-        }
+        Object.assign(m, { velocidade_nominal: velocidadeVal, sobrevelocidade: sobrevelocidadeVal, multiplicador_produto: multiplicadorVal, critica: criticaAtual });
+        if (tipoSelecionado === 'manual') m.alarmes = JSON.stringify(alarmesList);
+        if (criticaAtual) estadoConfig.maquinas.forEach(maq => { if (maq.id !== maquinaId) maq.critica = false; });
       }
       modal.remove();
       renderMaquinas();
       showToast('Configuração salva');
-    } catch (err) {
-      showToast(err.message || 'Erro ao salvar', 'erro');
-    }
+    } catch (err) { showToast(err.message || 'Erro ao salvar', 'erro'); }
   });
 
   document.getElementById('modal-maq-cancelar').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+}
+
+// ============================================================
+// MODAL: ADICIONAR DEVICE WISE
+// ============================================================
+
+function abrirModalAdicionarDevice(maquinaId, onSave) {
+  const m = document.createElement('div');
+  m.className = 'modal-overlay';
+  m.innerHTML = `
+    <div class="modal" style="max-width:400px;">
+      <h3>Novo dispositivo WISE</h3>
+      <div class="form-group">
+        <label>IP do dispositivo</label>
+        <input type="text" id="new-wise-ip" class="input" placeholder="Ex: 192.168.1.100">
+      </div>
+      <div class="form-group">
+        <label>Posição na linha</label>
+        <input type="text" id="new-wise-posicao" class="input" placeholder="Ex: saida, inspetor, entrada">
+        <p class="modal-sub" style="margin-top:4px;">Usado nas fórmulas de cálculo de produção.</p>
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label>Usuário</label>
+          <input type="text" id="new-wise-usuario" class="input" value="root">
+        </div>
+        <div class="form-group flex-1">
+          <label>Senha</label>
+          <input type="password" id="new-wise-senha" class="input" placeholder="Senha do WISE">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Ordem</label>
+        <input type="number" id="new-wise-ordem" class="input" value="1" min="1">
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="btn-salvar-wise-device">Adicionar</button>
+      <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-wise-device" style="margin-top:8px;">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(m);
+
+  document.getElementById('btn-salvar-wise-device').addEventListener('click', async () => {
+    const ip = document.getElementById('new-wise-ip').value.trim();
+    const posicao = document.getElementById('new-wise-posicao').value.trim();
+    const usuario = document.getElementById('new-wise-usuario').value.trim() || 'root';
+    const senha = document.getElementById('new-wise-senha').value;
+    const ordem = parseInt(document.getElementById('new-wise-ordem').value) || 1;
+    if (!ip || !posicao) { showToast('IP e posição são obrigatórios', 'erro'); return; }
+    try {
+      const novo = await api.criarWiseDevice(estadoConfig.linhaId, maquinaId, { ip, posicao, usuario, senha, ordem, ativo: true });
+      m.remove();
+      onSave(novo);
+      showToast('Dispositivo adicionado');
+    } catch (err) { showToast(err.message || 'Erro ao adicionar dispositivo', 'erro'); }
+  });
+
+  document.getElementById('btn-cancelar-wise-device').addEventListener('click', () => m.remove());
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+}
+
+// ============================================================
+// MODAL: ADICIONAR FÓRMULA — drag-and-drop de posições
+// ============================================================
+
+function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
+  const m = document.createElement('div');
+  m.className = 'modal-overlay';
+  m.innerHTML = `
+    <div class="modal" style="max-width:440px;">
+      <h3>Nova fórmula de cálculo</h3>
+      <div class="form-group">
+        <label>Resultado</label>
+        <select id="formula-resultado" class="input">
+          <option value="producao">Produção</option>
+          <option value="refugo">Refugo</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Posições disponíveis</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
+          ${posicoes.map(p => `
+            <span class="formula-posicao-chip" data-posicao="${p}"
+              style="background:var(--brand-bg);color:var(--brand);padding:4px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;cursor:pointer;border:1px solid var(--brand);transition:opacity 0.15s;">
+              ${p}
+            </span>
+          `).join('')}
+        </div>
+        <p class="modal-sub">Clique nas posições para adicionar à fórmula.</p>
+      </div>
+      <div class="form-group">
+        <label>Fórmula</label>
+        <div id="formula-builder" style="min-height:44px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--bg);">
+          <span style="font-size:0.8rem;color:var(--text-dim);" id="formula-placeholder">Clique nas posições acima para montar a fórmula...</span>
+        </div>
+      </div>
+      <p id="formula-preview" style="font-family:monospace;font-size:0.875rem;color:var(--text);text-align:center;min-height:20px;margin-bottom:8px;font-weight:600;"></p>
+      <button type="button" class="btn btn-outline btn-sm" id="btn-formula-limpar" style="margin-bottom:12px;width:100%;">Limpar</button>
+      <button type="button" class="btn btn-primary btn-block" id="btn-salvar-formula">Salvar fórmula</button>
+      <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-formula" style="margin-top:8px;">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(m);
+
+  let operacoes = [];
+
+  function atualizarBuilder() {
+    const builder = document.getElementById('formula-builder');
+    const placeholder = document.getElementById('formula-placeholder');
+    const preview = document.getElementById('formula-preview');
+    if (operacoes.length === 0) {
+      builder.innerHTML = '';
+      builder.appendChild(placeholder);
+      placeholder.style.display = '';
+      preview.textContent = '';
+      return;
+    }
+    placeholder.style.display = 'none';
+    builder.innerHTML = operacoes.map((op, i) => `
+      <div style="display:flex;align-items:center;gap:3px;">
+        ${i > 0 ? `
+          <button type="button" class="btn-op-toggle" data-index="${i}"
+            style="background:${op.operacao === '+' ? 'var(--green-dim)' : 'var(--red-dim)'};color:${op.operacao === '+' ? 'var(--green)' : 'var(--red)'};border:none;border-radius:4px;width:24px;height:24px;font-size:1rem;cursor:pointer;font-weight:700;line-height:1;">
+            ${op.operacao}
+          </button>
+        ` : ''}
+        <span style="background:var(--brand-bg);color:var(--brand);padding:3px 10px;border-radius:12px;font-size:0.8rem;font-weight:600;border:1px solid var(--brand);">${op.posicao}</span>
+        <button type="button" class="btn-op-remove" data-index="${i}" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:1rem;padding:0 2px;line-height:1;">×</button>
+      </div>
+    `).join('');
+
+    const expr = operacoes.map((o, i) => `${i > 0 ? ` ${o.operacao} ` : ''}${o.posicao}`).join('');
+    preview.textContent = expr;
+
+    builder.querySelectorAll('.btn-op-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.index);
+        operacoes[i].operacao = operacoes[i].operacao === '+' ? '-' : '+';
+        atualizarBuilder();
+      });
+    });
+    builder.querySelectorAll('.btn-op-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        operacoes.splice(parseInt(btn.dataset.index), 1);
+        atualizarBuilder();
+      });
+    });
+  }
+
+  m.querySelectorAll('.formula-posicao-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      operacoes.push({ posicao: chip.dataset.posicao, operacao: '+' });
+      atualizarBuilder();
+    });
+  });
+
+  document.getElementById('btn-formula-limpar').addEventListener('click', () => { operacoes = []; atualizarBuilder(); });
+
+  document.getElementById('btn-salvar-formula').addEventListener('click', async () => {
+    if (operacoes.length === 0) { showToast('Monte a fórmula antes de salvar', 'erro'); return; }
+    const resultado = document.getElementById('formula-resultado').value;
+    try {
+      const nova = await api.salvarWiseFormula(estadoConfig.linhaId, maquinaId, { resultado, operacoes: JSON.stringify(operacoes) });
+      m.remove();
+      onSave(nova);
+      showToast('Fórmula salva');
+    } catch (err) { showToast(err.message || 'Erro ao salvar fórmula', 'erro'); }
+  });
+
+  document.getElementById('btn-cancelar-formula').addEventListener('click', () => m.remove());
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
 }
 
 // ============================================================
@@ -636,7 +1038,6 @@ function configurarBotaoUsuarios() {
 
 async function abrirModalUsuarios() {
   document.getElementById('modal-usuarios')?.remove();
-
   const modal = document.createElement('div');
   modal.id = 'modal-usuarios';
   modal.className = 'modal-overlay';
@@ -647,24 +1048,14 @@ async function abrirModalUsuarios() {
       <div id="modal-usuarios-list" style="margin-bottom:20px;"></div>
       <p style="font-size:0.875rem;font-weight:600;color:var(--text);margin-bottom:12px;">Novo usuário</p>
       <div class="form-row">
-        <div class="form-group flex-1">
-          <label>Nome</label>
-          <input type="text" id="novo-usuario-nome" class="input" placeholder="Ex: João">
-        </div>
-        <div class="form-group flex-1">
-          <label>Sobrenome</label>
-          <input type="text" id="novo-usuario-sobrenome" class="input" placeholder="Ex: Silva">
-        </div>
+        <div class="form-group flex-1"><label>Nome</label><input type="text" id="novo-usuario-nome" class="input" placeholder="Ex: João"></div>
+        <div class="form-group flex-1"><label>Sobrenome</label><input type="text" id="novo-usuario-sobrenome" class="input" placeholder="Ex: Silva"></div>
       </div>
       <div class="form-group">
         <label>Usuário (gerado automaticamente)</label>
-        <input type="text" id="novo-usuario-login" class="input" placeholder="nome.sobrenome" readonly
-          style="color:var(--text-dim);background:var(--bg);cursor:default;">
+        <input type="text" id="novo-usuario-login" class="input" placeholder="nome.sobrenome" readonly style="color:var(--text-dim);background:var(--bg);cursor:default;">
       </div>
-      <div class="form-group">
-        <label>Senha</label>
-        <input type="password" id="novo-usuario-senha" class="input" placeholder="Mínimo 6 caracteres">
-      </div>
+      <div class="form-group"><label>Senha</label><input type="password" id="novo-usuario-senha" class="input" placeholder="Mínimo 6 caracteres"></div>
       <div class="form-group">
         <label>Nível de acesso</label>
         <select id="novo-usuario-nivel" class="input">
@@ -688,10 +1079,8 @@ async function abrirModalUsuarios() {
     const sobrenome = sobrenomeInput.value.trim().toLowerCase().replace(/\s+/g, '');
     loginInput.value = nome && sobrenome ? `${nome}.${sobrenome}` : nome || sobrenome || '';
   }
-
   nomeInput.addEventListener('input', atualizarLogin);
   sobrenomeInput.addEventListener('input', atualizarLogin);
-
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   document.getElementById('btn-fechar-usuarios').addEventListener('click', () => modal.remove());
 
@@ -701,21 +1090,15 @@ async function abrirModalUsuarios() {
     const login = loginInput.value.trim();
     const senha = document.getElementById('novo-usuario-senha').value;
     const nivel = document.getElementById('novo-usuario-nivel').value;
-
     if (!nome || !sobrenome) { showToast('Informe nome e sobrenome', 'erro'); return; }
     if (!senha || senha.length < 6) { showToast('Senha deve ter pelo menos 6 caracteres', 'erro'); return; }
-
     try {
       await api.criarUsuario({ nome: `${nome} ${sobrenome}`, login, senha, nivel });
       showToast('Usuário criado');
-      nomeInput.value = '';
-      sobrenomeInput.value = '';
-      loginInput.value = '';
+      nomeInput.value = ''; sobrenomeInput.value = ''; loginInput.value = '';
       document.getElementById('novo-usuario-senha').value = '';
       await renderListaUsuarios();
-    } catch (err) {
-      showToast(err.message || 'Erro ao criar usuário', 'erro');
-    }
+    } catch (err) { showToast(err.message || 'Erro ao criar usuário', 'erro'); }
   });
 
   await renderListaUsuarios();
@@ -727,12 +1110,10 @@ async function renderListaUsuarios() {
   try {
     const usuarios = await api.listarUsuarios();
     const usuarioAtual = window.usuarioAtual;
-
     if (usuarios.length === 0) {
       list.innerHTML = '<p style="font-size:0.8rem;color:var(--text-dim);text-align:center;padding:8px 0;">Nenhum usuário cadastrado</p>';
       return;
     }
-
     list.innerHTML = usuarios.map(u => `
       <div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">
         <div style="flex:1;">
@@ -740,37 +1121,24 @@ async function renderListaUsuarios() {
           <div style="font-size:0.75rem;color:var(--text-dim);">${u.login} · ${u.nivel}</div>
         </div>
         ${u.id !== usuarioAtual?.id ? `
-          <button type="button" class="btn-reset-senha" data-id="${u.id}" title="Redefinir senha"
-            style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:1rem;padding:4px;">🔑</button>
-          <button type="button" class="btn-deletar-usuario" data-id="${u.id}" title="Remover"
-            style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1.25rem;padding:4px;">×</button>
+          <button type="button" class="btn-reset-senha" data-id="${u.id}" title="Redefinir senha" style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:1rem;padding:4px;">🔑</button>
+          <button type="button" class="btn-deletar-usuario" data-id="${u.id}" title="Remover" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:1.25rem;padding:4px;">×</button>
         ` : '<span style="font-size:0.7rem;color:var(--brand);font-weight:600;padding:4px;">você</span>'}
       </div>
     `).join('');
-
     list.querySelectorAll('.btn-deletar-usuario').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm('Remover este usuário?')) return;
-        try {
-          await api.deletarUsuario(parseInt(btn.dataset.id));
-          showToast('Usuário removido');
-          await renderListaUsuarios();
-        } catch (err) {
-          showToast(err.message || 'Erro ao remover', 'erro');
-        }
+        try { await api.deletarUsuario(parseInt(btn.dataset.id)); showToast('Usuário removido'); await renderListaUsuarios(); }
+        catch (err) { showToast(err.message || 'Erro ao remover', 'erro'); }
       });
     });
-
     list.querySelectorAll('.btn-reset-senha').forEach(btn => {
       btn.addEventListener('click', async () => {
         const nova = prompt('Nova senha (mínimo 6 caracteres):');
         if (!nova || nova.length < 6) { showToast('Senha muito curta', 'erro'); return; }
-        try {
-          await api.alterarSenha(parseInt(btn.dataset.id), nova);
-          showToast('Senha alterada');
-        } catch (err) {
-          showToast(err.message || 'Erro ao alterar senha', 'erro');
-        }
+        try { await api.alterarSenha(parseInt(btn.dataset.id), nova); showToast('Senha alterada'); }
+        catch (err) { showToast(err.message || 'Erro ao alterar senha', 'erro'); }
       });
     });
   } catch {

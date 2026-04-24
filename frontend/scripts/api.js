@@ -254,4 +254,75 @@ export const api = {
   async filtrosDisponiveis(linhaId) {
     return request('GET', `/medicoes/filtros-disponiveis?linha_id=${linhaId}`);
   },
+
+  // ── WISE — Devices ────────────────────────────────────────
+
+  // Retorna todos os dispositivos WISE de uma máquina.
+  async listarWiseDevices(linhaId, maquinaId) {
+    return request('GET', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/`);
+  },
+
+  // Cadastra um novo dispositivo WISE numa máquina.
+  async criarWiseDevice(linhaId, maquinaId, dados) {
+    return request('POST', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/`, dados);
+  },
+
+  // Atualiza dados de um dispositivo WISE (IP, posição, ordem, credenciais).
+  async atualizarWiseDevice(linhaId, maquinaId, deviceId, dados) {
+    return request('PATCH', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/${deviceId}`, dados);
+  },
+
+  // Remove um dispositivo WISE e todos os seus canais.
+  async deletarWiseDevice(linhaId, maquinaId, deviceId) {
+    return request('DELETE', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/${deviceId}`);
+  },
+
+  // Testa conectividade com o WISE — retorna ok e lista de canais lidos.
+  async pingWiseDevice(linhaId, maquinaId, deviceId) {
+    return request('GET', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/${deviceId}/ping`);
+  },
+
+  // ── WISE — Channels ───────────────────────────────────────
+
+  // Retorna todos os canais configurados num dispositivo WISE.
+  async listarWiseChannels(linhaId, maquinaId, deviceId) {
+    return request('GET', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/${deviceId}/channels/`);
+  },
+
+  // Cadastra um canal num dispositivo WISE.
+  async criarWiseChannel(linhaId, maquinaId, deviceId, dados) {
+    return request('POST', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/${deviceId}/channels/`, dados);
+  },
+
+  // Atualiza configuração de um canal WISE.
+  async atualizarWiseChannel(linhaId, maquinaId, deviceId, channelId, dados) {
+    return request('PATCH', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/${deviceId}/channels/${channelId}`, dados);
+  },
+
+  // Remove um canal de um dispositivo WISE.
+  async deletarWiseChannel(linhaId, maquinaId, deviceId, channelId) {
+    return request('DELETE', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/devices/${deviceId}/channels/${channelId}`);
+  },
+
+  // ── WISE — Formulas ───────────────────────────────────────
+
+  // Retorna todas as fórmulas configuradas para uma máquina.
+  async listarWiseFormulas(linhaId, maquinaId) {
+    return request('GET', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/formulas/`);
+  },
+
+  // Cria ou substitui uma fórmula para um tipo de resultado (producao, refugo).
+  async salvarWiseFormula(linhaId, maquinaId, dados) {
+    return request('POST', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/formulas/`, dados);
+  },
+
+  // Atualiza as operações de uma fórmula existente.
+  async atualizarWiseFormula(linhaId, maquinaId, formulaId, dados) {
+    return request('PATCH', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/formulas/${formulaId}`, dados);
+  },
+
+  // Remove uma fórmula.
+  async deletarWiseFormula(linhaId, maquinaId, formulaId) {
+    return request('DELETE', `/linhas/${linhaId}/maquinas/${maquinaId}/wise/formulas/${formulaId}`);
+  },
 };

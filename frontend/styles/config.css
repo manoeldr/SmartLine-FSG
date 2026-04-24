@@ -9,19 +9,16 @@
 
 /* ── Toggle de tema claro/escuro ────────────────────────── */
 
-/* Linha com label à esquerda e toggle à direita */
 .theme-toggle-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-/* Coluna com nome e valor atual do tema */
 .theme-toggle-info { display: flex; flex-direction: column; gap: 2px; }
 .theme-toggle-label { font-size: 0.875rem; font-weight: 500; color: var(--text); }
 .theme-toggle-value { font-size: 0.75rem; color: var(--text-dim); }
 
-/* Switch de toggle — pill com animação suave */
 .theme-toggle {
   position: relative;
   width: 52px;
@@ -35,10 +32,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Estado ativo — fundo azul da marca */
 .theme-toggle.active { background: var(--brand); }
 
-/* Thumb circular que desliza dentro do toggle */
 .theme-toggle-thumb {
   position: absolute;
   top: 3px;
@@ -54,27 +49,22 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-/* Posição do thumb quando ativo */
 .theme-toggle.active .theme-toggle-thumb { transform: translateX(24px); }
 
-/* Ícones de lua (escuro) e sol (claro) dentro do thumb */
 .theme-toggle .icon-moon { display: block; color: #64748b; }
 .theme-toggle .icon-sun { display: none; color: #f59e0b; }
 .theme-toggle.active .icon-moon { display: none; }
 .theme-toggle.active .icon-sun { display: block; }
 
-/* ── Zona de perigo — reset de medição ──────────────────── */
+/* ── Zona de perigo ──────────────────────────────────────── */
 
-/* Seção com fundo e borda vermelhos sutis */
 .danger-zone {
   border-color: rgba(239, 68, 68, 0.2);
   background: rgba(239, 68, 68, 0.04);
 }
 
-/* Título da seção em vermelho */
 .danger-zone h3 { color: var(--red); }
 
-/* Texto descritivo abaixo do botão de reset */
 .danger-text {
   font-size: 0.75rem;
   color: var(--text-dim);
@@ -82,9 +72,8 @@
   margin-top: 8px;
 }
 
-/* ── Lista de máquinas da linha ─────────────────────────── */
+/* ── Lista de máquinas ───────────────────────────────────── */
 
-/* Item da máquina — linha horizontal com drag handle, nome e ações */
 .maquina-item {
   display: flex;
   align-items: center;
@@ -92,29 +81,29 @@
   padding: 12px 4px;
   border-bottom: 1px solid var(--border);
   cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-/* Remove separador do último item */
 .maquina-item:last-child { border-bottom: none; }
 
-/* Estado durante drag — opacidade reduzida com borda tracejada */
 .maquina-item.dragging {
   opacity: 0.4;
   border-bottom: 2px dashed var(--brand);
 }
 
-/* Handle de arrastar — cursor de mão */
 .drag-handle {
   cursor: grab;
   color: var(--text-dim);
   font-size: 1rem;
   padding: 0 2px;
   user-select: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
 }
 
 .drag-handle:active { cursor: grabbing; }
 
-/* Número de ordem da máquina na sequência */
 .maquina-ordem {
   font-size: 0.75rem;
   font-weight: 600;
@@ -122,14 +111,12 @@
   min-width: 18px;
 }
 
-/* Nome da máquina — ocupa o espaço restante */
 .maquina-nome {
   flex: 1;
   color: var(--text);
   font-weight: 500;
 }
 
-/* Botões de ação da máquina (configurar ⋮ e remover ×) */
 .maquina-item .btn-icon {
   background: none;
   border: none;
@@ -142,10 +129,8 @@
   transition: color 0.15s;
 }
 
-/* Destaque em vermelho ao passar o mouse */
 .maquina-item .btn-icon:hover { color: var(--red); }
 
-/* Mensagem de estado vazio na lista de máquinas */
 .empty-hint {
   font-size: 0.8125rem;
   color: var(--text-dim);
@@ -153,16 +138,17 @@
   padding: 12px 0;
 }
 
-/* Espaçamento em Configuração para os 2 botões flutuantes (Tema e Usuários) */
+/* Espaçamento para os botões flutuantes do header */
 .page-config .page-header {
   padding-right: 108px;
 }
 
-/* ── Botão de Gestão de Usuários (Header) ───────────────── */
+/* ── Botão de Gestão de Usuários ─────────────────────────── */
+
 #cfg-usuarios-btn {
   position: fixed;
   top: 20px;
-  right: 112px; /* 16px da margem + 36px do botao tema + 12px de gap */
+  right: 112px;
   z-index: 150;
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -178,9 +164,7 @@
   padding: 0;
 }
 
-#cfg-usuarios-btn:active {
-  transform: scale(0.90);
-}
+#cfg-usuarios-btn:active { transform: scale(0.90); }
 
 #cfg-usuarios-btn:hover,
 #cfg-usuarios-btn:active {
@@ -202,16 +186,50 @@
   filter: brightness(0) invert(1);
 }
 
-/* ── Drag and drop mobile ───────────────────────────────── */
+/* ── Seletor de tipo de medição (Manual/Semi Auto/Automático) */
 
-/* Previne seleção de texto durante arrasto no iOS */
-.maquina-item {
-  -webkit-user-select: none;
-  user-select: none;
+.cfg-tipo-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  color: var(--text-muted);
+  gap: 2px;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Desativa scroll durante toque no handle */
-.drag-handle {
-  touch-action: none;
-  -webkit-touch-callout: none;
+/* Estado ativo — destaque com cor da marca */
+.cfg-tipo-btn.active {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.cfg-tipo-btn:hover:not(.cfg-tipo-btn--disabled):not(.active) {
+  border-color: var(--brand-light);
+  background: var(--bg-card-alt);
+}
+
+/* Estado desabilitado — bloqueado, cursor not-allowed */
+.cfg-tipo-btn--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Somente PC — a seção WISE não aparece no mobile ──────── */
+@media (max-width: 767px) {
+  #cfg-secao-wise { display: none !important; }
+  .cfg-tipo-btn[data-tipo="semiautomatico"],
+  .cfg-tipo-btn[data-tipo="automatico"] {
+    opacity: 0.4;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
 }
