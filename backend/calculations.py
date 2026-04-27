@@ -41,13 +41,26 @@ def calcular_indicadores(
     num_paradas = 0
     ultimo_estado = "rodando"
 
+    # Lista de intervalos de funcionamento entre paradas consecutivas
+    # Usado para cálculo preciso do MTBF
+    # Formato: [(inicio_funcionamento, fim_funcionamento), ...]
+    intervalos_funcionamento = []
+    ultimo_fim_parada = None  # momento em que a última parada terminou (marcha)
+
     for ev in eventos:
         if ev.tipo == "parada":
+            if ultimo_fim_parada is not None:
+                # Registra o intervalo de funcionamento desde a última marcha até esta parada
+                intervalos_funcionamento.append(
+                    (ev.timestamp - ultimo_fim_parada).total_seconds() * 1000
+                )
             stop_time = ev.timestamp
             num_paradas += 1
             ultimo_estado = "parado"
+
         elif ev.tipo == "marcha" and stop_time:
             stopped_ms += (ev.timestamp - stop_time).total_seconds() * 1000
+            ultimo_fim_parada = ev.timestamp
             stop_time = None
             ultimo_estado = "rodando"
 
@@ -76,6 +89,7 @@ def calcular_indicadores(
 
     # ── Performance ──────────────────────────────────────────
     # Produção real / Produção esperada no tempo rodando
+    # Limitada a 100% — sobrevelocidade não infla o indicador
     running_horas = running_ms / 3_600_000
     producao_esperada = running_horas * (velocidade_nominal or 1)
     performance = (
@@ -85,13 +99,22 @@ def calcular_indicadores(
     )
 
     # ── OEE ──────────────────────────────────────────────────
-    # Disponibilidade × Performance (qualidade = 100% por ora)
+    # Disponibilidade × Performance × Qualidade
+    # Qualidade = 100% por enquanto (refugo não implementado)
     oee = (disponibilidade / 100) * (performance / 100) * 100
 
-    # ── MTBF e MTTR ──────────────────────────────────────────
-    # MTBF: tempo médio entre falhas (tempo rodando / nº paradas)
-    # MTTR: tempo médio de reparo (tempo parado / nº paradas)
-    mtbf_ms = (running_ms / num_paradas) if num_paradas > 0 else None
+    # ── MTBF ─────────────────────────────────────────────────
+    # Tempo médio de funcionamento entre falhas.
+    # Calculado como a média dos intervalos de funcionamento
+    # entre paradas consecutivas — requer ao menos 2 paradas.
+    # Com menos de 2 paradas retorna None.
+    if len(intervalos_funcionamento) >= 1:
+        mtbf_ms = sum(intervalos_funcionamento) / len(intervalos_funcionamento)
+    else:
+        mtbf_ms = None
+
+    # ── MTTR ─────────────────────────────────────────────────
+    # Tempo médio de reparo (tempo parado total / nº paradas)
     mttr_ms = (stopped_ms / num_paradas) if num_paradas > 0 else None
 
     return {
