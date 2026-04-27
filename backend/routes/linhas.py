@@ -86,6 +86,7 @@ def status_linha(linha_id: int, db: Session = Depends(get_db)):
                     "tempo_parado_ms": None,
                     "mtbf_ms": None,
                     "mttr_ms": None,
+                    "tipo": "manual",
                 })
                 continue
 
@@ -118,6 +119,7 @@ def status_linha(linha_id: int, db: Session = Depends(get_db)):
             "tempo_parado_ms": ind["stopped_ms"],
             "mtbf_ms": ind["mtbf_ms"],
             "mttr_ms": ind["mttr_ms"],
+            "tipo": medicao.tipo or "manual",
         })
 
     return resultado

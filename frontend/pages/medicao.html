@@ -5,7 +5,11 @@
   </header>
 
   <div id="med-not-configured" class="empty-state">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="1.5">
+      <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
+      <path d="M12 8v4" />
+      <path d="M12 16h.01" />
+    </svg>
     <p>Configure antes de medir</p>
     <span>Vá em <strong>Config</strong> para definir cliente, linha e velocidade nominal</span>
   </div>
@@ -18,8 +22,10 @@
         <span class="med-timer-label">Pronto para iniciar</span>
         <span class="med-timer-sub" id="med-machine-name-pre">Selecione uma máquina para começar</span>
       </div>
-      <button class="btn btn-primary btn-block" id="btn-start-measurement" style="margin-top: 16px;">Iniciar medição</button>
-      <button class="btn btn-outline btn-block hidden" id="btn-retomar-medicao" style="margin-top: 8px;">Retomar medição anterior</button>
+      <button class="btn btn-primary btn-block" id="btn-start-measurement" style="margin-top: 16px;">Iniciar
+        medição</button>
+      <button class="btn btn-outline btn-block hidden" id="btn-retomar-medicao" style="margin-top: 8px;">Retomar medição
+        anterior</button>
     </div>
 
     <!-- MEDIÇÃO ATIVA -->
@@ -32,11 +38,15 @@
 
       <div class="med-buttons" id="med-buttons">
         <button class="med-btn med-btn-marcha" id="btn-marcha">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3" />
+          </svg>
           <span>Marcha</span>
         </button>
         <button class="med-btn med-btn-parada" id="btn-parada">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+          </svg>
           <span>Parada</span>
         </button>
       </div>
@@ -88,16 +98,20 @@
       <div style="margin-bottom: 16px;">
         <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Máquina</label>
         <div id="modal-maquinas-list" class="alarm-list"></div>
-        <p id="modal-maquinas-empty" class="hidden" style="font-size:0.875rem;color:var(--text-dim);text-align:center;padding:12px 0;">
+        <p id="modal-maquinas-empty" class="hidden"
+          style="font-size:0.875rem;color:var(--text-dim);text-align:center;padding:12px 0;">
           Nenhuma máquina disponível no momento
         </p>
       </div>
       <div style="margin-bottom: 16px;">
-        <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Produção do dia até agora</label>
-        <input type="number" id="initial-production-input" placeholder="Ex: 24500" class="input input-lg" inputmode="numeric">
+        <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Produção do dia até
+          agora</label>
+        <input type="number" id="initial-production-input" placeholder="Ex: 24500" class="input input-lg"
+          inputmode="numeric">
       </div>
       <button type="button" class="btn btn-primary btn-block" id="btn-confirmar-inicio">Iniciar</button>
-      <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-inicio" style="margin-top:8px;">Cancelar</button>
+      <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-inicio"
+        style="margin-top:8px;">Cancelar</button>
     </div>
   </div>
 
@@ -136,8 +150,12 @@
     <div class="modal">
       <h3>Finalizar medição</h3>
       <p class="modal-sub">Informe a produção final (opcional — deixe vazio para usar a última leitura)</p>
-      <input type="number" id="final-production-input" placeholder="Produção final (opcional)" class="input input-lg" inputmode="numeric">
-      <button class="btn btn-danger btn-block" id="btn-confirm-finalize" style="margin-top: 12px;">Confirmar e encerrar</button>
+      <div id="final-production-group">
+        <input type="number" id="final-production-input" placeholder="Produção final (opcional)" class="input input-lg"
+          inputmode="numeric">
+      </div>
+      <button class="btn btn-danger btn-block" id="btn-confirm-finalize" style="margin-top: 12px;">Confirmar e
+        encerrar</button>
       <button class="btn btn-outline btn-block" id="btn-cancel-finalize" style="margin-top: 8px;">Cancelar</button>
     </div>
   </div>

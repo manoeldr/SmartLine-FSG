@@ -51,7 +51,7 @@ async function carregarClientes() {
   select.disabled = true;
   try {
     const clientes = await api.listarClientes();
-    select.innerHTML = '<option value="">Selecione um cliente...</option>';
+    select.innerHTML = '<option value="">Selecionar um cliente</option>';
     clientes.forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.id;
@@ -60,9 +60,14 @@ async function carregarClientes() {
     });
     const saved = store.config.clienteId;
     if (saved) {
-      select.value = saved;
-      estadoConfig.clienteId = saved;
-      await carregarLinhas(saved);
+      const optionExists = Array.from(select.options).some(opt => opt.value == saved);
+      if (optionExists) {
+        select.value = saved;
+        estadoConfig.clienteId = saved;
+        await carregarLinhas(saved);
+      } else {
+        select.value = '';
+      }
     }
   } catch {
     showToast('Erro ao carregar clientes', 'erro');
@@ -129,7 +134,7 @@ async function carregarLinhas(clienteId) {
   const select = document.getElementById('cfg-linha-select');
   const section = document.getElementById('cfg-linha-section');
   section.classList.remove('hidden');
-  select.innerHTML = '<option value="">Selecione uma linha...</option>';
+  select.innerHTML = '<option value="">Selecionar uma linha</option>';
   try {
     const linhas = await api.listarLinhas(clienteId);
     linhas.forEach(l => {
@@ -140,9 +145,14 @@ async function carregarLinhas(clienteId) {
     });
     const saved = store.config.linhaId;
     if (saved) {
-      select.value = saved;
-      estadoConfig.linhaId = saved;
-      await carregarMaquinas(saved);
+      const optionExists = Array.from(select.options).some(opt => opt.value == saved);
+      if (optionExists) {
+        select.value = saved;
+        estadoConfig.linhaId = saved;
+        await carregarMaquinas(saved);
+      } else {
+        select.value = '';
+      }
     }
   } catch {
     showToast('Erro ao carregar linhas', 'erro');
@@ -194,7 +204,7 @@ function configurarBotaoAdicionarLinha() {
 function limparLinhas() {
   const select = document.getElementById('cfg-linha-select');
   const section = document.getElementById('cfg-linha-section');
-  select.innerHTML = '<option value="">Selecione uma linha...</option>';
+  select.innerHTML = '<option value="">Selecionar uma linha</option>';
   section.classList.add('hidden');
   limparMaquinas();
 }

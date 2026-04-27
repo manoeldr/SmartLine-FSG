@@ -119,6 +119,7 @@ def medicao_ativa(maquina_linha_id: int, db: Session = Depends(get_db)):
             "producao_inicial": medicao.producao_inicial,
             "timestamp_inicio": medicao.timestamp_inicio.isoformat(),
             "maquina_linha_id": medicao.maquina_linha_id,
+            "tipo": medicao.tipo or "manual",
         },
         "eventos": [
             {
