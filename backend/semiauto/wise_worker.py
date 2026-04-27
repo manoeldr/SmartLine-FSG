@@ -12,26 +12,28 @@ import httpx
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal
-from backend.models.semiauto.wise_device import WiseDevice
-from backend.models.semiauto.wise_channel import WiseChannel
-from backend.models.semiauto.wise_raw import WiseRaw
 
-# Garante que todos os models estão registrados no SQLAlchemy
-# antes de qualquer query — necessário quando rodando em thread separada
+# ── Imports de todos os models ───────────────────────────────
+# Obrigatório importar TODOS antes de qualquer query para que o
+# SQLAlchemy consiga resolver os relacionamentos entre as tabelas.
+# A ausência de qualquer model aqui causa KeyError silencioso.
+import backend.models.cliente
+import backend.models.linha
+import backend.models.maquina_linha
+import backend.models.medicao
+import backend.models.evento
 import backend.models.semiauto.wise_device
 import backend.models.semiauto.wise_channel
 import backend.models.semiauto.wise_formula
 import backend.models.semiauto.wise_raw
-import backend.models.maquina_linha
-import backend.models.linha
-import backend.models.cliente
+
+from backend.models.semiauto.wise_device import WiseDevice
+from backend.models.semiauto.wise_channel import WiseChannel
+from backend.models.semiauto.wise_raw import WiseRaw
 
 logger = logging.getLogger(__name__)
 
-# Intervalo entre cada rodada de polling (segundos)
 POLL_INTERVAL = 5
-
-# Timeout por requisição HTTP ao WISE
 REQUEST_TIMEOUT = 8.0
 
 
@@ -58,7 +60,6 @@ def _poll_device(db: Session, device: WiseDevice) -> None:
         logger.warning(f"[wise_worker] Erro ao conectar em {device.ip}: {e}")
         return
 
-    # Busca canais ativos configurados para este device
     canais_config = db.query(WiseChannel).filter(
         WiseChannel.device_id == device.id,
         WiseChannel.ativo == True,
@@ -74,11 +75,9 @@ def _poll_device(db: Session, device: WiseDevice) -> None:
             )
             continue
 
-        # Para DI: usa o campo Stat (estado atual 0/1)
-        # Para Counter: usa o campo Val (contador acumulado)
         if canal.tipo == "DI":
             valor = float(dado_wise.get("Stat", 0))
-        else:  # Counter
+        else:
             valor = float(dado_wise.get("Val", 0))
 
         raw = WiseRaw(
@@ -99,7 +98,6 @@ def _poll_device(db: Session, device: WiseDevice) -> None:
 def _poll_todos() -> None:
     """
     Busca todos os devices ativos no banco e faz polling de cada um.
-    Usa uma sessão por rodada para evitar conexões abertas por muito tempo.
     """
     db: Session = SessionLocal()
     try:
@@ -115,7 +113,7 @@ def _poll_todos() -> None:
 def iniciar_worker() -> None:
     """
     Loop principal do worker. Roda indefinidamente com intervalo POLL_INTERVAL.
-    Projetado para rodar em thread daemon — encerra junto com o processo principal.
+    Projetado para rodar em thread daemon.
     """
     logger.info(f"[wise_worker] Iniciando polling a cada {POLL_INTERVAL}s")
     while True:

@@ -22,6 +22,21 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal
+
+# ── Imports de todos os models ───────────────────────────────
+# Obrigatório importar TODOS antes de qualquer query para que o
+# SQLAlchemy consiga resolver os relacionamentos entre as tabelas.
+# A ausência de qualquer model aqui causa KeyError silencioso.
+import backend.models.cliente
+import backend.models.linha
+import backend.models.maquina_linha
+import backend.models.medicao
+import backend.models.evento
+import backend.models.semiauto.wise_device
+import backend.models.semiauto.wise_channel
+import backend.models.semiauto.wise_formula
+import backend.models.semiauto.wise_raw
+
 from backend.models.medicao import Medicao
 from backend.models.evento import Evento
 from backend.models.maquina_linha import MaquinaLinha
@@ -35,29 +50,14 @@ from backend.calculations import (
     detectar_estado_di,
 )
 
-# Importa todos os models necessários para o SQLAlchemy resolver os relacionamentos
-import backend.models.cliente
-import backend.models.linha
-import backend.models.maquina_linha
-import backend.models.semiauto.wise_device
-import backend.models.semiauto.wise_channel
-import backend.models.semiauto.wise_formula
-import backend.models.semiauto.wise_raw
-
 logger = logging.getLogger(__name__)
 
-# Intervalo entre cada rodada de processamento (segundos)
 PROCESS_INTERVAL = 10
-
-# Janela de leituras para detecção de parada (segundos atrás)
 WINDOW_SECONDS = 120
 
 
 def _buscar_medicoes_ativas(db: Session) -> list[Medicao]:
-    """
-    Retorna todas as medições semi-automáticas ativas (sem timestamp_fim).
-    Só processa medições do tipo semiautomatico.
-    """
+    """Retorna todas as medições semi-automáticas ativas (sem timestamp_fim)."""
     return db.query(Medicao).filter(
         Medicao.tipo == "semiautomatico",
         Medicao.timestamp_fim.is_(None),
@@ -65,9 +65,7 @@ def _buscar_medicoes_ativas(db: Session) -> list[Medicao]:
 
 
 def _buscar_devices_da_maquina(db: Session, maquina_linha_id: int) -> list[WiseDevice]:
-    """
-    Retorna todos os dispositivos WISE ativos vinculados a uma máquina.
-    """
+    """Retorna todos os dispositivos WISE ativos vinculados a uma máquina."""
     return db.query(WiseDevice).filter(
         WiseDevice.maquina_linha_id == maquina_linha_id,
         WiseDevice.ativo == True,
@@ -75,9 +73,7 @@ def _buscar_devices_da_maquina(db: Session, maquina_linha_id: int) -> list[WiseD
 
 
 def _buscar_canais_ativos(db: Session, device_id: int) -> list[WiseChannel]:
-    """
-    Retorna todos os canais ativos de um dispositivo WISE.
-    """
+    """Retorna todos os canais ativos de um dispositivo WISE."""
     return db.query(WiseChannel).filter(
         WiseChannel.device_id == device_id,
         WiseChannel.ativo == True,
@@ -85,9 +81,7 @@ def _buscar_canais_ativos(db: Session, device_id: int) -> list[WiseChannel]:
 
 
 def _buscar_formulas(db: Session, maquina_linha_id: int) -> list[WiseFormula]:
-    """
-    Retorna todas as fórmulas configuradas para uma máquina.
-    """
+    """Retorna todas as fórmulas configuradas para uma máquina."""
     return db.query(WiseFormula).filter(
         WiseFormula.maquina_linha_id == maquina_linha_id,
     ).all()
@@ -96,7 +90,7 @@ def _buscar_formulas(db: Session, maquina_linha_id: int) -> list[WiseFormula]:
 def _ultimo_estado_maquina(db: Session, medicao_id: int) -> str:
     """
     Retorna o último estado registrado da máquina ('rodando' ou 'parado').
-    Considera o evento mais recente de marcha ou parada.
+    Estado inicial padrão é 'rodando'.
     """
     ultimo = db.query(Evento).filter(
         Evento.medicao_id == medicao_id,
@@ -104,7 +98,7 @@ def _ultimo_estado_maquina(db: Session, medicao_id: int) -> str:
     ).order_by(Evento.timestamp.desc()).first()
 
     if not ultimo:
-        return "rodando"  # estado inicial padrão
+        return "rodando"
     return "parado" if ultimo.tipo == "parada" else "rodando"
 
 
@@ -117,11 +111,7 @@ def _registrar_transicao(
 ) -> None:
     """
     Registra evento de marcha ou parada se houve transição de estado.
-    Evita registrar eventos duplicados verificando o estado atual.
-
-    Parâmetros:
-        novo_estado: "rodando" ou "parado"
-        origem: descrição da origem para o motivo (ex: "DI canal 3", "Counter canal 1")
+    Evita duplicatas verificando o estado atual antes de inserir.
     """
     estado_atual = _ultimo_estado_maquina(db, medicao.id)
 
@@ -153,10 +143,7 @@ def _processar_di(
 ) -> None:
     """
     Processa um canal DI de marcha/parada.
-
-    Busca as leituras recentes do canal na janela WINDOW_SECONDS,
-    detecta o estado atual usando detectar_estado_di() do calculations.py,
-    e gera evento de parada ou marcha se houve transição de estado.
+    Busca leituras na janela WINDOW_SECONDS e detecta estado via detectar_estado_di().
     """
     janela_inicio = agora - timedelta(seconds=WINDOW_SECONDS)
 
@@ -186,25 +173,17 @@ def _processar_counter_marcha_parada(
     agora: datetime,
 ) -> None:
     """
-    Detecta marcha/parada usando um canal Counter.
-
-    Se o valor do counter não incrementou nos últimos
-    tempo_sem_alteracao_segundos → considera parada.
-    Quando voltar a incrementar → marcha.
-
-    Isso permite usar um único sensor counter tanto para
-    contagem de produção quanto para detecção de parada.
+    Detecta marcha/parada por ausência de incremento no counter.
+    Se delta == 0 no período threshold → parada. Se > 0 → rodando.
     """
     threshold = canal.tempo_sem_alteracao_segundos or 30
     janela_inicio = agora - timedelta(seconds=threshold)
 
-    # Primeira leitura na janela
     primeira = db.query(WiseRaw).filter(
         WiseRaw.channel_id == canal.id,
         WiseRaw.timestamp >= janela_inicio,
     ).order_by(WiseRaw.timestamp.asc()).first()
 
-    # Última leitura na janela
     ultima = db.query(WiseRaw).filter(
         WiseRaw.channel_id == canal.id,
         WiseRaw.timestamp <= agora,
@@ -214,13 +193,9 @@ def _processar_counter_marcha_parada(
         return
 
     delta = calcular_delta_counter(ultima.valor, primeira.valor)
-
-    # Delta None = reset do counter — ignora
     if delta is None:
         return
 
-    # Se o counter não incrementou na janela → parada
-    # Se incrementou → rodando
     novo_estado = "parado" if delta == 0 else "rodando"
     _registrar_transicao(db, medicao, novo_estado, agora, f"Counter canal {canal.numero_canal}")
 
@@ -234,44 +209,32 @@ def _processar_producao_slot(
 ) -> None:
     """
     Calcula e registra a produção do slot horário atual.
-
-    Um slot horário é definido como o intervalo completo de 1 hora
-    contado a partir do início da medição (igual ao slot da medição manual).
+    Slot = intervalo de 1 hora a partir do início da medição.
     Só processa se o slot atual ainda não foi registrado.
-
-    Para cada fórmula configurada:
-        1. Calcula o delta de cada counter no slot
-        2. Aplica o multiplicador_produto da máquina
-        3. Aplica a fórmula (ex: saida - inspetor)
-        4. Grava evento de producao com o resultado acumulado
     """
-    interval_ms = 3_600_000  # 1 hora em ms
+    interval_ms = 3_600_000
     elapsed_ms = (agora - medicao.timestamp_inicio).total_seconds() * 1000
     slot_atual = int(elapsed_ms // interval_ms)
 
     if slot_atual < 1:
-        return  # ainda não completou o primeiro slot
+        return
 
-    # Verifica quantos slots já foram processados
     num_eventos_producao = db.query(Evento).filter(
         Evento.medicao_id == medicao.id,
         Evento.tipo == "producao",
     ).count()
 
     if num_eventos_producao >= slot_atual:
-        return  # slot já processado
+        return
 
-    # Define a janela do slot a processar
     slot_inicio = medicao.timestamp_inicio + timedelta(hours=num_eventos_producao)
     slot_fim = slot_inicio + timedelta(hours=1)
 
-    # Busca o multiplicador de produto da máquina
     maquina = db.query(MaquinaLinha).filter(
         MaquinaLinha.id == medicao.maquina_linha_id
     ).first()
     multiplicador = (maquina.multiplicador_produto or 1.0) if maquina else 1.0
 
-    # Monta dict de deltas por posição: {posicao: delta_total_no_slot}
     deltas_por_posicao: dict[str, float] = {}
 
     for device in devices:
@@ -283,13 +246,11 @@ def _processar_producao_slot(
         ).all()
 
         for canal in canais_counter:
-            # Primeira leitura do slot
             primeira = db.query(WiseRaw).filter(
                 WiseRaw.channel_id == canal.id,
                 WiseRaw.timestamp >= slot_inicio,
             ).order_by(WiseRaw.timestamp.asc()).first()
 
-            # Última leitura do slot
             ultima = db.query(WiseRaw).filter(
                 WiseRaw.channel_id == canal.id,
                 WiseRaw.timestamp <= slot_fim,
@@ -301,12 +262,10 @@ def _processar_producao_slot(
             delta = calcular_delta_counter(ultima.valor, primeira.valor)
             if delta is None:
                 logger.warning(
-                    f"[wise_processor] Delta negativo no canal {canal.id} "
-                    f"(possível reset do counter) — slot ignorado"
+                    f"[wise_processor] Delta negativo no canal {canal.id} — slot ignorado"
                 )
                 continue
 
-            # Aplica o multiplicador de produto antes de associar à posição
             delta_ajustado = delta * multiplicador
             posicao = device.posicao
             deltas_por_posicao[posicao] = deltas_por_posicao.get(posicao, 0.0) + delta_ajustado
@@ -314,7 +273,6 @@ def _processar_producao_slot(
     if not deltas_por_posicao:
         return
 
-    # Aplica cada fórmula e registra evento de producao
     for formula in formulas:
         try:
             operacoes = json.loads(formula.operacoes)
@@ -325,12 +283,10 @@ def _processar_producao_slot(
         resultado = aplicar_formula(operacoes, deltas_por_posicao)
         if resultado is None:
             logger.warning(
-                f"[wise_processor] Fórmula {formula.id} ({formula.resultado}) "
-                f"— posição ausente nos deltas, slot ignorado"
+                f"[wise_processor] Fórmula {formula.id} — posição ausente nos deltas, slot ignorado"
             )
             continue
 
-        # Produção acumulada = producao_inicial + resultado do slot
         producao_acumulada = (medicao.producao_inicial or 0) + int(resultado)
 
         evento = Evento(
@@ -343,19 +299,16 @@ def _processar_producao_slot(
         db.add(evento)
         logger.info(
             f"[wise_processor] Medicao {medicao.id} — slot {slot_atual} "
-            f"{formula.resultado}: {int(resultado)} unidades "
-            f"(multiplicador: {multiplicador})"
+            f"{formula.resultado}: {int(resultado)} unidades"
         )
 
 
 def _processar_medicao(db: Session, medicao: Medicao, agora: datetime) -> None:
     """
     Processa uma medição semi-automática ativa.
-
-    Para cada canal de cada device:
-        - DI com funcao=marcha_parada → detectar_estado_di
-        - Counter com funcao=contagem → detecção de parada por ausência de incremento
-    Depois calcula a produção do slot horário se aplicável.
+    Percorre canais de cada device e delega para _processar_di ou
+    _processar_counter_marcha_parada conforme o tipo/função do canal.
+    Depois tenta processar o slot de produção.
     """
     devices = _buscar_devices_da_maquina(db, medicao.maquina_linha_id)
     if not devices:
@@ -369,7 +322,6 @@ def _processar_medicao(db: Session, medicao: Medicao, agora: datetime) -> None:
             if canal.funcao == "marcha_parada" and canal.tipo == "DI":
                 _processar_di(db, medicao, canal, agora)
             elif canal.funcao == "contagem" and canal.tipo == "Counter":
-                # Counter também detecta marcha/parada pela ausência de incremento
                 _processar_counter_marcha_parada(db, medicao, canal, agora)
 
     if formulas:
@@ -379,22 +331,21 @@ def _processar_medicao(db: Session, medicao: Medicao, agora: datetime) -> None:
 
 
 def _processar_todos() -> None:
-    """
-    Busca todas as medições semi-automáticas ativas e processa cada uma.
-    Usa uma sessão por rodada para evitar conexões abertas por muito tempo.
-    """
     db: Session = SessionLocal()
     agora = datetime.now()
     try:
         medicoes = _buscar_medicoes_ativas(db)
+        print(f"[wise_processor] Rodada — {len(medicoes)} medições ativas", flush=True)  # <-- adicionar
         for medicao in medicoes:
             try:
                 _processar_medicao(db, medicao, agora)
             except Exception as e:
                 logger.error(f"[wise_processor] Erro ao processar medição {medicao.id}: {e}")
+                print(f"[wise_processor] ERRO medicao {medicao.id}: {e}", flush=True)  # <-- adicionar
                 db.rollback()
     except Exception as e:
         logger.error(f"[wise_processor] Erro na rodada de processamento: {e}")
+        print(f"[wise_processor] ERRO geral: {e}", flush=True)  # <-- adicionar
     finally:
         db.close()
 
@@ -406,6 +357,7 @@ def iniciar_processor() -> None:
     Projetado para rodar em thread daemon.
     """
     logger.info(f"[wise_processor] Iniciando processamento a cada {PROCESS_INTERVAL}s")
+    print(f"[wise_processor] Iniciando processamento a cada {PROCESS_INTERVAL}s", flush=True)
     while True:
         try:
             _processar_todos()

@@ -27,6 +27,10 @@ from backend.routes.semiauto.wise_devices import router as wise_devices_router
 from backend.routes.semiauto.wise_channels import router as wise_channels_router
 from backend.routes.semiauto.wise_formulas import router as wise_formulas_router
 
+import threading
+from backend.semiauto.wise_worker import iniciar_worker
+from backend.semiauto.wise_processor import iniciar_processor
+
 Base.metadata.create_all(bind=engine)
 
 # ============================================================
@@ -128,6 +132,11 @@ app.include_router(maquinas_router)
 app.include_router(wise_devices_router)
 app.include_router(wise_channels_router)
 app.include_router(wise_formulas_router)
+
+@app.on_event("startup")
+def startup_event():
+    threading.Thread(target=iniciar_worker, daemon=True).start()
+    threading.Thread(target=iniciar_processor, daemon=True).start()
 
 @app.get("/")
 def root():
