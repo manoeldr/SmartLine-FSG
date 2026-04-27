@@ -326,7 +326,7 @@ setInterval(() => {
   if (currentPage === 'overview') updateOverview();
   if (currentPage === 'medicao')  updateMedicao();
 
-  if (store.measurement.active && store.measurement.medicaoId && usuarioAtual?.nivel !== 'cliente') {
+  if (usuarioAtual && store.measurement.active && store.measurement.medicaoId && usuarioAtual.nivel !== 'cliente') {
     if (store.shouldPromptProduction()) {
       vibrate([300, 100, 300, 100, 300]);
 

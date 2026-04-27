@@ -223,6 +223,26 @@
   pointer-events: none;
 }
 
+/* ── Ícones do seletor de tipo ───────────────────────────── */
+
+/* Botões inline da seção WISE */
+.btn-wise-add-inline:hover,
+.btn-wise-ping:hover,
+.btn-wise-channels:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* Tema escuro: inverte para ficar visível no fundo escuro */
+[data-theme="dark"] .cfg-tipo-btn img {
+  filter: brightness(0) invert(1) opacity(0.5);
+}
+
+/* Tema escuro ativo: mantém a cor da marca */
+[data-theme="dark"] .cfg-tipo-btn.active img {
+  filter: brightness(0) saturate(100%) invert(28%) sepia(89%) saturate(600%) hue-rotate(204deg);
+}
+
 /* ── Somente PC — a seção WISE não aparece no mobile ──────── */
 @media (max-width: 767px) {
   #cfg-secao-wise { display: none !important; }

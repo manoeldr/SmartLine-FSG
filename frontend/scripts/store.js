@@ -42,6 +42,9 @@ const defaultData = () => ({
     medicaoId: null,
     lastSyncedEventIndex: 0,
     lastSyncTime: null,
+    // Tipo da medição: "manual", "semiautomatico" ou "automatico"
+    // Determinado no início e consultado do backend para adaptar a UI
+    tipo: 'manual',
   },
 });
 
@@ -77,8 +80,9 @@ export const store = {
         if (this._data.measurement.medicaoId === undefined) this._data.measurement.medicaoId = null;
         if (this._data.measurement.lastSyncedEventIndex === undefined) this._data.measurement.lastSyncedEventIndex = 0;
         if (this._data.measurement.lastSyncTime === undefined) this._data.measurement.lastSyncTime = null;
-        // Migração: campo novo de slot fixo de produção
         if (this._data.measurement.lastProductionSlot === undefined) this._data.measurement.lastProductionSlot = 0;
+        // Migração: campo tipo da medição
+        if (!this._data.measurement.tipo) this._data.measurement.tipo = 'manual';
       } catch {
         this._data = defaultData();
       }
@@ -202,6 +206,8 @@ export const store = {
       m.lastSyncedEventIndex = eventsLocal.length;
       m.lastSyncTime = new Date().toISOString();
       m.lastProductionPrompt = Date.now();
+      // Restaura o tipo da medição a partir dos dados do backend
+      m.tipo = resultado.medicao?.tipo || dados.tipo || 'manual';
 
       // Recalcula o slot atual com base no tempo já decorrido ao restaurar
       const intervalMs = (this._data.config.productionInterval || 60) * 60 * 1000;
@@ -227,8 +233,8 @@ export const store = {
   // ============================================================
 
   // Inicia uma nova medição: reseta o estado, cria no backend e inicia o tracking.
-  // Passa usuario_nome do usuário logado para o backend registrar quem está medindo.
-  startMeasurement(initialProduction) {
+  // tipo: "manual" | "semiautomatico" | "automatico"
+  startMeasurement(initialProduction, tipo = 'manual') {
     const m = this._data.measurement;
     m.active = true;
     m.started = true;
@@ -244,6 +250,7 @@ export const store = {
     m.medicaoId = null;
     m.lastSyncedEventIndex = 0;
     m.lastSyncTime = null;
+    m.tipo = tipo;
     this.save();
 
     const cfg = this._data.config;
@@ -256,6 +263,7 @@ export const store = {
       producao_inicial: initialProduction,
       maquina_linha_id: cfg.maquinaLinhaId,
       usuario_nome: window.usuarioAtual?.nome || null,
+      tipo,
     }).then(resultado => {
       if (resultado?.id) {
         this._data.measurement.medicaoId = resultado.id;
@@ -425,13 +433,13 @@ export const store = {
   // ============================================================
 
   // Verifica se é hora de solicitar uma nova leitura de produção.
-  // Usa slots fixos ancorados no início da medição para que o intervalo
-  // não se acumule conforme o tempo de resposta do auditor.
-  // Ex: intervalo de 60min → slot 1 dispara em 60min, slot 2 em 120min, etc.
+  // No modo semiautomatico, nunca solicita — a produção vem do wise_processor.
   shouldPromptProduction() {
     const m = this._data.measurement;
     if (!m.active || m.state !== 'running') return false;
     if (!m.startTime) return false;
+    // Apenas modo manual solicita a produção pontualmente
+    if (m.tipo !== 'manual') return false;
 
     const intervalMs = (this._data.config.productionInterval || 60) * 60 * 1000;
     const elapsed = Date.now() - new Date(m.startTime).getTime();

@@ -12,6 +12,10 @@
 import { store } from './store.js';
 import { api } from './api.js';
 
+// Estilo base reutilizado nos botões pequenos da seção WISE.
+// Definido aqui para manter consistência sem conflitar com .btn/.btn-sm do projeto.
+const BTN_WISE = `padding:4px 10px;font-size:0.75rem;font-weight:600;background:var(--brand);border:1.5px solid var(--brand);border-radius:var(--radius-sm);color:#fff;cursor:pointer;transition:opacity 0.15s;display:inline-flex;align-items:center;gap:4px;`;
+
 let estadoConfig = {
   clienteId: null,
   linhaId: null,
@@ -386,8 +390,8 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
   // Carrega devices WISE existentes para detectar o tipo atual
   let wiseDevices = [];
   try { wiseDevices = await api.listarWiseDevices(estadoConfig.linhaId, maquinaId); } catch { }
-
-  const tipoAtual = wiseDevices.length > 0 ? 'semiautomatico' : 'manual';
+  // Sempre abre nas configurações manuais por default, conforme solicitado
+  const tipoAtual = 'manual';
 
   const modal = document.createElement('div');
   modal.id = 'modal-config-maquina';
@@ -402,17 +406,17 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
         <label style="font-size:0.75rem;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;display:block;margin-bottom:10px;">Tipo de medição</label>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
           <button type="button" class="cfg-tipo-btn ${tipoAtual === 'manual' ? 'active' : ''}" data-tipo="manual">
-            <span style="font-size:1.25rem;display:block;margin-bottom:2px;">📱</span>
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px" fill="currentColor" style="margin-bottom:4px;"><path d="M240-160v-640 640ZM637-40q-26 0-49-10.5T548-80L346-322l45-46q18-18 44-22.5t49 7.5l116 58v-355h80q66 0 113 47t47 113v320q0 66-47 113T680-40h-43ZM240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h360q33 0 56.5 23.5T680-800v120h-80v-120H240v640h241l67 80H240Zm208.5-611.5Q460-703 460-720t-11.5-28.5Q437-760 420-760t-28.5 11.5Q380-737 380-720t11.5 28.5Q403-680 420-680t28.5-11.5ZM637-120h43q33 0 56.5-23t23.5-57v-320q0-33-23.5-56.5T680-600v405L468-302l138 168q6 7 14 10.5t17 3.5Z"/></svg>
             <span style="font-size:0.8rem;font-weight:600;display:block;">Manual</span>
             <span style="font-size:0.7rem;color:inherit;opacity:0.75;display:block;">Pelo celular</span>
           </button>
           <button type="button" class="cfg-tipo-btn ${tipoAtual === 'semiautomatico' ? 'active' : ''}" data-tipo="semiautomatico">
-            <span style="font-size:1.25rem;display:block;margin-bottom:2px;">📡</span>
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px" fill="currentColor" style="margin-bottom:4px;"><path d="M280-200q-33 0-56.5-23.5T200-280v-400q0-33 23.5-56.5T280-760h400q33 0 56.5 23.5T760-680v400q0 33-23.5 56.5T680-200H280Zm0 80h400q66 0 113-47t47-113v-400q0-66-47-113t-113-47H280q-66 0-113 47t-47 113v400q0 66 47 113t113 47Zm11-379-55-55q42-51 108.5-78.5T480-660q67 0 134 27.5T723-554l-55 55q-35-38-83.5-59.5T480-580q-56 0-104.5 21.5T291-499Zm114 114-57-57q26-28 60.5-43t72.5-15q38 0 71.5 15t59.5 43l-56 57q-14-15-34.5-25T480-420q-21 0-41 10t-34 25Zm46.5 93.5Q440-303 440-320t11.5-28.5Q463-360 480-360t28.5 11.5Q520-337 520-320t-11.5 28.5Q497-280 480-280t-28.5-11.5ZM480-480Z"/></svg>
             <span style="font-size:0.8rem;font-weight:600;display:block;">Semi Auto</span>
             <span style="font-size:0.7rem;color:inherit;opacity:0.75;display:block;">Via IOT</span>
           </button>
           <button type="button" class="cfg-tipo-btn cfg-tipo-btn--disabled" data-tipo="automatico" disabled title="Em breve">
-            <span style="font-size:1.25rem;display:block;margin-bottom:2px;">🔌</span>
+            <svg xmlns="http://www.w3.org/2000/svg" height="28px" viewBox="0 -960 960 960" width="28px" fill="currentColor" style="margin-bottom:4px;"><path d="M160-120v-200q0-33 23.5-56.5T240-400h480q33 0 56.5 23.5T800-320v200H160Zm200-320q-83 0-141.5-58.5T160-640q0-83 58.5-141.5T360-840h240q83 0 141.5 58.5T800-640q0 83-58.5 141.5T600-440H360ZM240-200h480v-120H240v120Zm120-320h240q50 0 85-35t35-85q0-50-35-85t-85-35H360q-50 0-85 35t-35 85q0 50 35 85t85 35Zm28.5-91.5Q400-623 400-640t-11.5-28.5Q377-680 360-680t-28.5 11.5Q320-657 320-640t11.5 28.5Q343-600 360-600t28.5-11.5Zm240 0Q640-623 640-640t-11.5-28.5Q617-680 600-680t-28.5 11.5Q560-657 560-640t11.5 28.5Q583-600 600-600t28.5-11.5ZM480-200Zm0-440Z"/></svg>
             <span style="font-size:0.8rem;font-weight:600;display:block;">Automático</span>
             <span style="font-size:0.7rem;color:inherit;opacity:0.75;display:block;">Em breve</span>
           </button>
@@ -472,7 +476,7 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
             <p style="font-size:0.875rem;font-weight:600;color:var(--text);margin:0;">Dispositivos WISE</p>
             <p class="modal-sub" style="margin:2px 0 0;">Sensores IOT conectados a esta máquina</p>
           </div>
-          <button type="button" class="btn btn-sm" id="btn-wise-add-device">+ Adicionar</button>
+          <button type="button" id="btn-wise-add-device" style="${BTN_WISE}">+ Adicionar</button>
         </div>
         <div id="wise-devices-list"></div>
 
@@ -482,7 +486,8 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
           <p class="modal-sub" style="margin:0;">Defina como calcular produção e refugo</p>
         </div>
         <div id="wise-formulas-list"></div>
-        <button type="button" class="btn btn-outline btn-sm" id="btn-wise-add-formula" style="margin-top:8px;width:100%;">+ Adicionar fórmula</button>
+        <!-- CORREÇÃO 1: botão Adicionar fórmula no mesmo tamanho do Salvar -->
+        <button type="button" id="btn-wise-add-formula" class="btn btn-primary btn-block" style="margin-top:8px;">+ Adicionar fórmula</button>
       </div>
 
       <button type="button" class="btn btn-primary btn-block" id="modal-maq-salvar" style="margin-top:16px;">Salvar</button>
@@ -568,6 +573,9 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
   });
 
   // ── WISE Devices ──────────────────────────────────────────
+  const pingIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" height="13px" viewBox="0 -960 960 960" width="13px" fill="currentColor"><path d="M160-240v-80h260L80-660l56-56 344 343 208-208q-4-9-6-18.5t-2-20.5q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29q-9 0-17.5-1.5T746-526L540-320h260v80H160Z"/></svg>`;
+  const BTN_DEL = `background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:1.125rem;line-height:1;padding:0 4px;transition:color 0.15s;`;
+
   function renderWiseDevices() {
     const container = document.getElementById('wise-devices-list');
     if (!container) return;
@@ -576,24 +584,24 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
       return;
     }
     container.innerHTML = devicesWise.map(d => `
-      <div class="wise-device-item" data-id="${d.id}" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <div class="wise-device-item" data-id="${d.id}" style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
             <span style="font-size:0.875rem;font-weight:600;color:var(--text);">${d.posicao}</span>
             <span style="font-size:0.75rem;color:var(--text-dim);margin-left:8px;">${d.ip}</span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            <button type="button" class="btn-wise-ping btn btn-sm" data-id="${d.id}" style="padding:4px 8px;font-size:0.75rem;">📡 Ping</button>
-            <button type="button" class="btn-wise-channels btn btn-sm" data-id="${d.id}" style="padding:4px 8px;font-size:0.75rem;">Canais</button>
-            <button type="button" class="btn-wise-delete btn-icon" data-id="${d.id}" style="color:var(--red);">×</button>
+            <button type="button" class="btn-wise-ping" data-id="${d.id}" style="${BTN_WISE}">${pingIconSvg} Ping</button>
+            <button type="button" class="btn-wise-channels" data-id="${d.id}" style="${BTN_WISE}">Canais</button>
+            <button type="button" class="btn-wise-delete" data-id="${d.id}" style="${BTN_DEL}"
+              onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-dim)'">×</button>
           </div>
         </div>
-        <div class="wise-ping-result" data-id="${d.id}" style="display:none;font-size:0.75rem;"></div>
+        <div class="wise-ping-result" data-id="${d.id}" style="display:none;font-size:0.75rem;margin-top:6px;"></div>
         <div class="wise-channels-panel" data-id="${d.id}" style="display:none;margin-top:8px;"></div>
       </div>
     `).join('');
 
-    // Ping
     container.querySelectorAll('.btn-wise-ping').forEach(btn => {
       btn.addEventListener('click', async () => {
         const deviceId = parseInt(btn.dataset.id);
@@ -617,7 +625,6 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
       });
     });
 
-    // Canais
     container.querySelectorAll('.btn-wise-channels').forEach(btn => {
       btn.addEventListener('click', async () => {
         const deviceId = parseInt(btn.dataset.id);
@@ -634,7 +641,6 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
       });
     });
 
-    // Deletar device
     container.querySelectorAll('.btn-wise-delete').forEach(btn => {
       btn.addEventListener('click', async () => {
         const deviceId = parseInt(btn.dataset.id);
@@ -655,41 +661,64 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
   function renderWiseChannels(panel, deviceId, canais) {
     const funcaoLabel = { marcha_parada: 'Marcha/Parada', contagem: 'Contagem', alarme: 'Alarme' };
     panel.innerHTML = `
-      <div style="border-top:1px solid var(--border);padding-top:8px;">
+      <div style="border-top:1px solid var(--border);padding-top:10px;">
         <p style="font-size:0.7rem;font-weight:600;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Canais configurados</p>
         ${canais.length === 0
-          ? '<p style="font-size:0.75rem;color:var(--text-dim);">Nenhum canal cadastrado</p>'
+          ? '<p style="font-size:0.8rem;color:var(--text-dim);margin-bottom:10px;">Nenhum canal cadastrado</p>'
           : canais.map(c => `
-            <div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">
-              <span style="font-size:0.75rem;font-weight:700;color:var(--text-dim);min-width:18px;">${c.numero_canal}</span>
-              <span style="font-size:0.8rem;color:var(--text);flex:1;">${c.tipo} — ${funcaoLabel[c.funcao] || c.funcao}</span>
-              ${c.funcao === 'marcha_parada' || c.funcao === 'contagem' ? `<span style="font-size:0.7rem;color:var(--text-dim);">${c.tempo_sem_alteracao_segundos}s</span>` : ''}
-              ${c.alarme_motivo ? `<span style="font-size:0.7rem;color:var(--amber);">${c.alarme_motivo}</span>` : ''}
-              <button type="button" class="btn-del-channel btn-icon" data-device="${deviceId}" data-channel="${c.id}" style="color:var(--red);">×</button>
+            <div class="alarm-item" style="margin-bottom:6px;">
+              <span style="font-size:0.8125rem;">
+                <strong style="color:var(--text-dim);margin-right:6px;">Ch ${c.numero_canal}</strong>
+                ${c.tipo} — ${funcaoLabel[c.funcao] || c.funcao}
+                ${c.funcao === 'marcha_parada' || c.funcao === 'contagem'
+                  ? `<span style="font-size:0.7rem;color:var(--text-dim);margin-left:6px;">${c.tempo_sem_alteracao_segundos}s sem sinal</span>`
+                  : ''}
+                ${c.alarme_motivo
+                  ? `<span style="font-size:0.7rem;color:var(--amber);margin-left:6px;">${c.alarme_motivo}</span>`
+                  : ''}
+              </span>
+              <button type="button" class="btn-del-channel remove-alarm" data-device="${deviceId}" data-channel="${c.id}">×</button>
             </div>
           `).join('')}
-        <div style="margin-top:10px;">
-          <p style="font-size:0.7rem;font-weight:600;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Novo canal</p>
-          <div style="display:grid;grid-template-columns:60px 1fr 1fr;gap:6px;margin-bottom:6px;">
-            <input type="number" class="input ch-numero" placeholder="Canal" min="0" max="7" style="font-size:0.8rem;padding:6px;">
-            <select class="input ch-tipo" style="font-size:0.8rem;padding:6px;">
-              <option value="DI">DI</option>
-              <option value="Counter">Counter</option>
+        <p style="font-size:0.7rem;font-weight:600;color:var(--text-dim);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.5px;">Novo canal</p>
+        <div class="form-group">
+          <label>Número do canal (0–7)</label>
+          <input type="number" class="input ch-numero" placeholder="Ex: 0" min="0" max="7">
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Tipo de sinal</label>
+            <select class="input ch-tipo">
+              <option value="DI">DI — Digital</option>
+              <option value="Counter">Counter — Pulsos</option>
             </select>
-            <select class="input ch-funcao" style="font-size:0.8rem;padding:6px;">
+          </div>
+          <div class="form-group flex-1">
+            <label>Função</label>
+            <select class="input ch-funcao">
               <option value="contagem">Contagem</option>
               <option value="marcha_parada">Marcha/Parada</option>
               <option value="alarme">Alarme</option>
             </select>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 80px;gap:6px;margin-bottom:6px;">
-            <input type="text" class="input ch-motivo" placeholder="Motivo (somente alarme)" style="font-size:0.8rem;padding:6px;">
-            <input type="number" class="input ch-threshold" value="30" style="font-size:0.8rem;padding:6px;" title="Segundos sem alteração para considerar parada">
-          </div>
-          <button type="button" class="btn btn-sm btn-primary btn-add-channel" data-device="${deviceId}" style="width:100%;">+ Adicionar canal</button>
         </div>
+        <div class="form-group ch-motivo-group" style="display:none;">
+          <label>Motivo do alarme</label>
+          <input type="text" class="input ch-motivo" placeholder="Ex: Falta de matéria-prima">
+        </div>
+        <div class="form-group">
+          <label>Tempo sem sinal para considerar parada (segundos)</label>
+          <input type="number" class="input ch-threshold" value="30" min="5">
+        </div>
+        <button type="button" class="btn btn-primary btn-block btn-add-channel" data-device="${deviceId}">+ Adicionar canal</button>
       </div>
     `;
+
+    const funcaoSelect = panel.querySelector('.ch-funcao');
+    const motivoGroup = panel.querySelector('.ch-motivo-group');
+    funcaoSelect.addEventListener('change', () => {
+      motivoGroup.style.display = funcaoSelect.value === 'alarme' ? '' : 'none';
+    });
 
     panel.querySelectorAll('.btn-del-channel').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -740,7 +769,8 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
           <div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;">
             <span style="font-size:0.8rem;font-weight:600;color:var(--brand);min-width:64px;">${resultadoLabel[f.resultado] || f.resultado}</span>
             <span style="font-size:0.8rem;color:var(--text);flex:1;font-family:monospace;">${expr}</span>
-            <button type="button" class="btn-del-formula btn-icon" data-id="${f.id}" style="color:var(--red);">×</button>
+            <button type="button" class="btn-del-formula" data-id="${f.id}"
+              style="${BTN_DEL}" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-dim)'">×</button>
           </div>
         `;
       }).join('');
@@ -757,7 +787,6 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
     }
   }
 
-  // Adicionar device
   document.getElementById('btn-wise-add-device')?.addEventListener('click', () => {
     abrirModalAdicionarDevice(maquinaId, async (novoDevice) => {
       devicesWise.push(novoDevice);
@@ -765,7 +794,6 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
     });
   });
 
-  // Adicionar fórmula
   document.getElementById('btn-wise-add-formula')?.addEventListener('click', () => {
     const posicoes = [...new Set(devicesWise.map(d => d.posicao))];
     if (posicoes.length === 0) { showToast('Cadastre ao menos um dispositivo WISE antes de criar fórmulas', 'erro'); return; }
@@ -874,7 +902,10 @@ function abrirModalAdicionarDevice(maquinaId, onSave) {
 }
 
 // ============================================================
-// MODAL: ADICIONAR FÓRMULA — drag-and-drop de posições
+// MODAL: ADICIONAR FÓRMULA — builder de posições
+// Clique nas posições disponíveis para montar a expressão.
+// O botão +/- ao lado de cada posição alterna entre soma e subtração.
+// CORREÇÃO: builder usa innerHTML corretamente para renderizar os botões de toggle.
 // ============================================================
 
 function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
@@ -883,6 +914,7 @@ function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
   m.innerHTML = `
     <div class="modal" style="max-width:440px;">
       <h3>Nova fórmula de cálculo</h3>
+      <p class="modal-sub">Clique nas posições para montar a fórmula. Use o botão +/− para alternar a operação.</p>
       <div class="form-group">
         <label>Resultado</label>
         <select id="formula-resultado" class="input">
@@ -892,75 +924,93 @@ function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
       </div>
       <div class="form-group">
         <label>Posições disponíveis</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
+        <div id="formula-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">
           ${posicoes.map(p => `
             <span class="formula-posicao-chip" data-posicao="${p}"
-              style="background:var(--brand-bg);color:var(--brand);padding:4px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;cursor:pointer;border:1px solid var(--brand);transition:opacity 0.15s;">
+              style="background:var(--brand-bg);color:var(--brand);padding:4px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;cursor:pointer;border:1px solid var(--brand);transition:opacity 0.15s;user-select:none;">
               ${p}
             </span>
           `).join('')}
         </div>
-        <p class="modal-sub">Clique nas posições para adicionar à fórmula.</p>
       </div>
       <div class="form-group">
         <label>Fórmula</label>
-        <div id="formula-builder" style="min-height:44px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--bg);">
-          <span style="font-size:0.8rem;color:var(--text-dim);" id="formula-placeholder">Clique nas posições acima para montar a fórmula...</span>
+        <div id="formula-builder" style="min-height:48px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--bg);">
+          <span id="formula-placeholder" style="font-size:0.8rem;color:var(--text-dim);">Clique nas posições acima para montar a fórmula...</span>
         </div>
       </div>
-      <p id="formula-preview" style="font-family:monospace;font-size:0.875rem;color:var(--text);text-align:center;min-height:20px;margin-bottom:8px;font-weight:600;"></p>
-      <button type="button" class="btn btn-outline btn-sm" id="btn-formula-limpar" style="margin-bottom:12px;width:100%;">Limpar</button>
+      <p id="formula-preview" style="font-family:monospace;font-size:0.875rem;color:var(--text);text-align:center;min-height:20px;margin-bottom:12px;font-weight:600;"></p>
+      <!-- CORREÇÃO 2: botão Limpar no mesmo tamanho do Salvar fórmula -->
+      <button type="button" class="btn btn-outline btn-block" id="btn-formula-limpar" style="margin-bottom:8px;">Limpar</button>
       <button type="button" class="btn btn-primary btn-block" id="btn-salvar-formula">Salvar fórmula</button>
       <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-formula" style="margin-top:8px;">Cancelar</button>
     </div>
   `;
   document.body.appendChild(m);
 
+  // Lista de operações: [{posicao, operacao}]
   let operacoes = [];
 
+  // CORREÇÃO 3: builder renderiza via DOM (não innerHTML) para evitar perda de eventos
   function atualizarBuilder() {
     const builder = document.getElementById('formula-builder');
     const placeholder = document.getElementById('formula-placeholder');
     const preview = document.getElementById('formula-preview');
+
+    // Limpa o builder mantendo apenas o placeholder
+    [...builder.children].forEach(c => { if (c.id !== 'formula-placeholder') c.remove(); });
+
     if (operacoes.length === 0) {
-      builder.innerHTML = '';
-      builder.appendChild(placeholder);
       placeholder.style.display = '';
       preview.textContent = '';
       return;
     }
-    placeholder.style.display = 'none';
-    builder.innerHTML = operacoes.map((op, i) => `
-      <div style="display:flex;align-items:center;gap:3px;">
-        ${i > 0 ? `
-          <button type="button" class="btn-op-toggle" data-index="${i}"
-            style="background:${op.operacao === '+' ? 'var(--green-dim)' : 'var(--red-dim)'};color:${op.operacao === '+' ? 'var(--green)' : 'var(--red)'};border:none;border-radius:4px;width:24px;height:24px;font-size:1rem;cursor:pointer;font-weight:700;line-height:1;">
-            ${op.operacao}
-          </button>
-        ` : ''}
-        <span style="background:var(--brand-bg);color:var(--brand);padding:3px 10px;border-radius:12px;font-size:0.8rem;font-weight:600;border:1px solid var(--brand);">${op.posicao}</span>
-        <button type="button" class="btn-op-remove" data-index="${i}" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:1rem;padding:0 2px;line-height:1;">×</button>
-      </div>
-    `).join('');
 
+    placeholder.style.display = 'none';
+
+    operacoes.forEach((op, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'display:flex;align-items:center;gap:3px;';
+
+      // Botão de toggle +/- (apenas a partir do segundo item)
+      if (i > 0) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.textContent = op.operacao;
+        toggleBtn.style.cssText = `background:${op.operacao === '+' ? 'var(--green-dim)' : 'var(--red-dim)'};color:${op.operacao === '+' ? 'var(--green)' : 'var(--red)'};border:none;border-radius:4px;width:24px;height:24px;font-size:1rem;cursor:pointer;font-weight:700;line-height:1;flex-shrink:0;`;
+        toggleBtn.addEventListener('click', () => {
+          operacoes[i].operacao = operacoes[i].operacao === '+' ? '-' : '+';
+          atualizarBuilder();
+        });
+        wrapper.appendChild(toggleBtn);
+      }
+
+      // Chip da posição
+      const chip = document.createElement('span');
+      chip.textContent = op.posicao;
+      chip.style.cssText = 'background:var(--brand-bg);color:var(--brand);padding:3px 10px;border-radius:12px;font-size:0.8rem;font-weight:600;border:1px solid var(--brand);';
+      wrapper.appendChild(chip);
+
+      // Botão remover ×
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.textContent = '×';
+      removeBtn.style.cssText = 'background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:1rem;padding:0 2px;line-height:1;';
+      removeBtn.addEventListener('click', () => {
+        operacoes.splice(i, 1);
+        atualizarBuilder();
+      });
+      wrapper.appendChild(removeBtn);
+
+      builder.appendChild(wrapper);
+    });
+
+    // Preview de texto
     const expr = operacoes.map((o, i) => `${i > 0 ? ` ${o.operacao} ` : ''}${o.posicao}`).join('');
     preview.textContent = expr;
-
-    builder.querySelectorAll('.btn-op-toggle').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const i = parseInt(btn.dataset.index);
-        operacoes[i].operacao = operacoes[i].operacao === '+' ? '-' : '+';
-        atualizarBuilder();
-      });
-    });
-    builder.querySelectorAll('.btn-op-remove').forEach(btn => {
-      btn.addEventListener('click', () => {
-        operacoes.splice(parseInt(btn.dataset.index), 1);
-        atualizarBuilder();
-      });
-    });
   }
 
+  // Clique nas posições disponíveis adiciona à fórmula
   m.querySelectorAll('.formula-posicao-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       operacoes.push({ posicao: chip.dataset.posicao, operacao: '+' });
@@ -968,7 +1018,10 @@ function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
     });
   });
 
-  document.getElementById('btn-formula-limpar').addEventListener('click', () => { operacoes = []; atualizarBuilder(); });
+  document.getElementById('btn-formula-limpar').addEventListener('click', () => {
+    operacoes = [];
+    atualizarBuilder();
+  });
 
   document.getElementById('btn-salvar-formula').addEventListener('click', async () => {
     if (operacoes.length === 0) { showToast('Monte a fórmula antes de salvar', 'erro'); return; }
