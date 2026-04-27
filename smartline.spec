@@ -46,6 +46,13 @@ a = Analysis(
         'anyio._backends._asyncio',
         'email_validator',
         'multiprocessing',
+        # Módulos semi-automático WISE-4051
+        'backend.semiauto.wise_worker',
+        'backend.semiauto.wise_processor',
+        'backend.routes.semiauto.wise_devices',
+        'backend.routes.semiauto.wise_channels',
+        'backend.routes.semiauto.wise_formulas',
+        'requests',
     ],
     hookspath=[],
     runtime_hooks=[],
