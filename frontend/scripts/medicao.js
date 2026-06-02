@@ -6,6 +6,11 @@
 // Suporta dois tipos de medição:
 //   "manual"        — auditor controla marcha/parada e produção
 //   "semiautomatico"— botões marcha/parada ocultos; eventos vêm do WISE
+//
+// Suporta pausa programada:
+//   - Botão Pausar abre modal de motivo de pausa
+//   - Durante pausa: timer congela, botões ficam opacos/bloqueados, badge âmbar
+//   - Botão Retomar restaura o estado anterior à pausa
 // ============================================================
 
 import { store } from './store.js';
@@ -14,8 +19,7 @@ import { formatTime, formatTimeMM, vibrate } from './utils.js';
 
 let maquinaSelecionada = null;
 let currentMachineAlarms = [];
-
-// ID do último evento de parada registrado — usado para enviar a foto ao backend.
+let currentPauseReasons = [];
 let ultimoEventoParadaId = null;
 
 // ============================================================
@@ -25,13 +29,12 @@ let ultimoEventoParadaId = null;
 export function initMedicao() {
   const notConfigured = document.getElementById('med-not-configured');
   const content = document.getElementById('med-content');
-
   const m = store.measurement;
 
   if (m.active && m.started) {
     if (notConfigured) notConfigured.classList.add('hidden');
     if (content) content.classList.remove('hidden');
-    showActiveScreen();
+    showActiveScreen(store.measurement.tipo || 'manual');
     return;
   }
 
@@ -69,10 +72,8 @@ function showPreStartScreen() {
 }
 
 // Exibe a tela de medição ativa.
-// Adapta a UI conforme o tipo da medição:
-//   - manual: mostra botões marcha/parada
-//   - semiautomatico: oculta botões marcha/parada, atualiza estado do backend periodicamente
-async function showActiveScreen() {
+// tipoOverride é passado diretamente para evitar busca ao backend antes do medicaoId existir.
+async function showActiveScreen(tipoOverride = null) {
   document.getElementById('med-pre-start')?.classList.add('hidden');
   document.getElementById('med-active')?.classList.remove('hidden');
   document.getElementById('med-finished')?.classList.add('hidden');
@@ -84,10 +85,9 @@ async function showActiveScreen() {
   const machineName = document.getElementById('med-machine-name');
   if (machineName) machineName.textContent = store.config.machine;
 
-  // Busca o tipo atual da medição do backend para garantir precisão
-  const tipo = await _fetchTipoMedicao();
+  const tipo = tipoOverride || await _fetchTipoMedicao();
 
-  // Adapta a UI conforme o tipo
+  // Oculta botões marcha/parada no semi-automático
   const medButtons = document.getElementById('med-buttons');
   if (medButtons) {
     medButtons.style.display = tipo === 'semiautomatico' ? 'none' : '';
@@ -96,18 +96,20 @@ async function showActiveScreen() {
   updateButtonStates();
   updateMedicao();
 
-  // Listeners dos botões — só relevantes no modo manual
   if (tipo === 'manual') {
     replaceWithClone('btn-marcha', el => el.addEventListener('click', handleMarcha));
     replaceWithClone('btn-parada', el => el.addEventListener('click', handleParada));
   }
 
   replaceWithClone('btn-confirm-reason',   el => el.addEventListener('click', handleConfirmReason));
+  replaceWithClone('btn-pausar',           el => el.addEventListener('click', handlePausar));
+  replaceWithClone('btn-retomar-pausa',    el => el.addEventListener('click', handleRetomar));
   replaceWithClone('btn-finalize',         el => el.addEventListener('click', () => showFinalizeModal()));
   replaceWithClone('btn-confirm-finalize', el => el.addEventListener('click', () => handleFinalize(tipo)));
   replaceWithClone('btn-cancel-finalize',  el => el.addEventListener('click', () => {
     document.getElementById('modal-finalize')?.classList.add('hidden');
   }));
+  replaceWithClone('btn-confirm-pause-reason', el => el.addEventListener('click', handleConfirmPauseReason));
 
   replaceWithClone('btn-add-custom-reason', el => el.addEventListener('click', async () => {
     const input = document.getElementById('custom-reason-input');
@@ -119,18 +121,25 @@ async function showActiveScreen() {
     if (!currentMachineAlarms.some(a => a.name === name)) {
       currentMachineAlarms.push({ name, category });
       renderAlarmList(currentMachineAlarms);
-
       const linhaId = store.config.linhaId;
       const maquinaId = store.config.maquinaLinhaId;
       if (linhaId && maquinaId) {
-        try {
-          await api.atualizarMaquina(linhaId, maquinaId, { alarmes: JSON.stringify(currentMachineAlarms) });
-        } catch (err) {
-          console.warn('Não foi possível salvar alarme de máquina:', err);
-        }
+        try { await api.atualizarMaquina(linhaId, maquinaId, { alarmes: JSON.stringify(currentMachineAlarms) }); }
+        catch (err) { console.warn('Não foi possível salvar alarme:', err); }
       }
     }
+    if (input) input.value = '';
+  }));
 
+  replaceWithClone('btn-add-pause-reason', el => el.addEventListener('click', async () => {
+    const input = document.getElementById('custom-pause-reason-input');
+    const name = input?.value.trim();
+    if (!name) return;
+    if (!currentPauseReasons.some(r => r === name)) {
+      currentPauseReasons.push(name);
+      await salvarMotivosPausa(currentPauseReasons);
+      renderPauseReasonList(currentPauseReasons);
+    }
     if (input) input.value = '';
   }));
 
@@ -151,29 +160,20 @@ async function showActiveScreen() {
     document.getElementById('modal-shift-end')?.classList.add('hidden');
   }));
 
-  // No modo semi-automático, sincroniza eventos do backend periodicamente
-  // para manter o estado de marcha/parada e produção atualizados na UI
   if (tipo === 'semiautomatico') {
     _iniciarSyncSemiAuto();
   }
 }
 
-// Busca o tipo da medição ativa no backend.
-// Retorna "manual" se não conseguir ou se não houver medição ativa.
 async function _fetchTipoMedicao() {
-  const medicaoId = store.measurement.medicaoId;
-
-  // Se tiver no store e for confiável, usa direto
   if (store.measurement.tipo && store.measurement.tipo !== 'manual') {
     return store.measurement.tipo;
   }
-
+  const medicaoId = store.measurement.medicaoId;
   if (!medicaoId) return store.measurement.tipo || 'manual';
-
   try {
     const medicao = await api.getMedicao(medicaoId);
     const tipo = medicao?.tipo || 'manual';
-    // Salva no store para evitar buscas desnecessárias
     store.measurement.tipo = tipo;
     store.save();
     return tipo;
@@ -182,9 +182,6 @@ async function _fetchTipoMedicao() {
   }
 }
 
-// Inicia a sincronização periódica para medições semi-automáticas.
-// Puxa os eventos mais recentes do backend e atualiza o estado local
-// para refletir paradas/marchas detectadas pelo wise_processor.
 let _semiAutoSyncInterval = null;
 function _iniciarSyncSemiAuto() {
   if (_semiAutoSyncInterval) clearInterval(_semiAutoSyncInterval);
@@ -195,19 +192,17 @@ function _iniciarSyncSemiAuto() {
       const medicao = await api.getMedicao(m.medicaoId);
       if (!medicao) return;
 
-      // Atualiza o estado de marcha/parada com base no último evento do backend
       const eventos = medicao.eventos || [];
       const ultimoEstado = eventos.filter(e => e.tipo === 'marcha' || e.tipo === 'parada').slice(-1)[0];
       if (ultimoEstado) {
         const novoEstado = ultimoEstado.tipo === 'marcha' ? 'running' : 'stopped';
-        if (novoEstado !== m.state) {
+        if (novoEstado !== m.state && m.state !== 'paused') {
           m.state = novoEstado;
           store.save();
           updateButtonStates();
         }
       }
 
-      // Atualiza produção com o último evento de produção do backend
       const ultimaProducao = eventos.filter(e => e.tipo === 'producao' && e.producao_leitura !== null).slice(-1)[0];
       if (ultimaProducao?.producao_leitura != null) {
         const leituraAtual = store.getDisplayProduction();
@@ -217,7 +212,7 @@ function _iniciarSyncSemiAuto() {
         }
       }
     } catch { /* silencioso */ }
-  }, 10000); // Sincroniza a cada 10s
+  }, 10000);
 }
 
 function showFinishedScreen() {
@@ -245,7 +240,7 @@ function showFinishedScreen() {
 }
 
 // ============================================================
-// RETOMAR MEDIÇÃO
+// RETOMAR MEDIÇÃO ANTERIOR
 // ============================================================
 
 async function verificarMedicoesNaoFinalizadas(switchScreen = false) {
@@ -315,6 +310,7 @@ function abrirModalRetomar(medicoes) {
   list.querySelectorAll('.alarm-item').forEach(el => {
     el.addEventListener('click', async () => {
       const medicaoId = parseInt(el.dataset.id);
+      const tipo = el.dataset.tipo || 'manual';
       await store.restoreFromBackendById(medicaoId, {
         maquina: el.dataset.maquina,
         maquinaLinhaId: el.dataset.maquinaLinhaId ? parseInt(el.dataset.maquinaLinhaId) : null,
@@ -324,10 +320,10 @@ function abrirModalRetomar(medicoes) {
         turnoInicio: el.dataset.turnoInicio,
         turnoFim: el.dataset.turnoFim,
         velocidade: parseFloat(el.dataset.velocidade),
-        tipo: el.dataset.tipo || 'manual',
+        tipo,
       });
       modal.classList.add('hidden');
-      showActiveScreen();
+      showActiveScreen(tipo);
     });
   });
 
@@ -358,23 +354,19 @@ async function abrirModalIniciar() {
   async function renderEtapaCliente() {
     list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Carregando clientes...</p>';
     if (empty) empty.classList.add('hidden');
-
     try {
       const clientes = await api.listarClientes();
       if (clientes.length === 0) {
         list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Nenhum cliente cadastrado</p>';
         return;
       }
-
       const sub = modal.querySelector('.modal-sub');
       if (sub) sub.textContent = 'Selecione o cliente';
-
       list.innerHTML = clientes.map(c => `
         <div class="alarm-item" data-id="${c.id}" data-nome="${c.nome}" style="justify-content:flex-start;">
           <span>${c.nome}</span>
         </div>
       `).join('');
-
       list.querySelectorAll('.alarm-item').forEach(el => {
         el.addEventListener('click', () => {
           clienteSelecionadoId = parseInt(el.dataset.id);
@@ -389,10 +381,8 @@ async function abrirModalIniciar() {
 
   async function renderEtapaLinha() {
     list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Carregando linhas...</p>';
-
     const sub = modal.querySelector('.modal-sub');
     if (sub) sub.textContent = `${clienteSelecionadoNome} → Selecione a linha`;
-
     try {
       const linhas = await api.listarLinhas(clienteSelecionadoId);
       if (linhas.length === 0) {
@@ -403,7 +393,6 @@ async function abrirModalIniciar() {
         document.getElementById('btn-voltar-cliente')?.addEventListener('click', renderEtapaCliente);
         return;
       }
-
       list.innerHTML = `
         <button class="btn btn-outline btn-block" id="btn-voltar-cliente" style="margin-bottom:8px;font-size:0.8rem;">← Voltar</button>
         ${linhas.map(l => `
@@ -412,9 +401,7 @@ async function abrirModalIniciar() {
           </div>
         `).join('')}
       `;
-
       document.getElementById('btn-voltar-cliente')?.addEventListener('click', renderEtapaCliente);
-
       list.querySelectorAll('.alarm-item').forEach(el => {
         el.addEventListener('click', () => {
           linhaSelecionadaId = parseInt(el.dataset.id);
@@ -427,17 +414,12 @@ async function abrirModalIniciar() {
     }
   }
 
-  // Renderiza lista de máquinas com indicação do tipo de medição de cada uma.
-  // O tipo é detectado pela presença de devices WISE cadastrados na máquina.
   async function renderEtapaMaquina() {
     list.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Carregando máquinas...</p>';
-
     const sub = modal.querySelector('.modal-sub');
     if (sub) sub.textContent = `${clienteSelecionadoNome} → ${linhaSelecionadaNome} → Selecione a máquina`;
-
     try {
       const maquinas = await api.ocupacaoMaquinas(linhaSelecionadaId);
-
       if (maquinas.length === 0) {
         list.innerHTML = `
           <p style="color:var(--text-dim);font-size:0.875rem;text-align:center;">Nenhuma máquina cadastrada</p>
@@ -447,15 +429,12 @@ async function abrirModalIniciar() {
         return;
       }
 
-      // Busca devices WISE de cada máquina para determinar o tipo
       const tiposMap = {};
       await Promise.all(maquinas.map(async m => {
         try {
           const devices = await api.listarWiseDevices(linhaSelecionadaId, m.id);
           tiposMap[m.id] = devices.length > 0 ? 'semiautomatico' : 'manual';
-        } catch {
-          tiposMap[m.id] = 'manual';
-        }
+        } catch { tiposMap[m.id] = 'manual'; }
       }));
 
       const tipoLabel = { manual: 'Manual', semiautomatico: 'Semiautomático', automatico: 'Automático' };
@@ -494,7 +473,6 @@ async function abrirModalIniciar() {
       `;
 
       document.getElementById('btn-voltar-linha')?.addEventListener('click', renderEtapaLinha);
-
       list.querySelectorAll('.alarm-item:not([style*="pointer-events:none"])').forEach(el => {
         el.addEventListener('click', () => {
           list.querySelectorAll('.alarm-item').forEach(e => e.classList.remove('selected'));
@@ -506,22 +484,14 @@ async function abrirModalIniciar() {
     }
   }
 
-  if (linhaSelecionadaId) {
-    await renderEtapaMaquina();
-  } else if (clienteSelecionadoId) {
-    await renderEtapaLinha();
-  } else {
-    await renderEtapaCliente();
-  }
+  if (linhaSelecionadaId) await renderEtapaMaquina();
+  else if (clienteSelecionadoId) await renderEtapaLinha();
+  else await renderEtapaCliente();
 
-  // Confirmar início — detecta o tipo da máquina selecionada e inicia a medição
   replaceWithClone('btn-confirmar-inicio', el => {
     el.addEventListener('click', async () => {
       const selected = list.querySelector('.alarm-item.selected');
-      if (!selected) {
-        list.style.outline = '1px solid var(--red)';
-        return;
-      }
+      if (!selected) { list.style.outline = '1px solid var(--red)'; return; }
       const input = document.getElementById('initial-production-input');
       const value = parseInt(input.value);
       if (isNaN(value) || value < 0) {
@@ -564,16 +534,16 @@ async function abrirModalIniciar() {
         speed: rawSpeed,
         productMultiplier: multiplier,
         alarms: maquinaDetalhes?.alarmes ? JSON.parse(maquinaDetalhes.alarmes) : store.config.alarms,
+        temRefugo: maquinaDetalhes?.tem_refugo || false,
       });
 
       modal.classList.add('hidden');
       input.value = '';
       input.style.borderColor = '';
 
-      // Inicia a medição passando o tipo detectado
       store.startMeasurement(value, maquinaSelecionada.tipo);
       vibrate([100]);
-      showActiveScreen();
+      showActiveScreen(maquinaSelecionada.tipo);
     });
   });
 
@@ -616,7 +586,7 @@ function clearShiftEndCountdown() {
 
 function handleMarcha() {
   const m = store.measurement;
-  if (m.state === 'running') return;
+  if (m.state === 'running' || m.state === 'paused') return;
   store.setMarcha();
   vibrate([100]);
   updateButtonStates();
@@ -629,16 +599,110 @@ function handleMarcha() {
 
 async function handleParada() {
   const m = store.measurement;
-  if (m.state === 'stopped') return;
-
+  if (m.state === 'stopped' || m.state === 'paused') return;
   ultimoEventoParadaId = null;
   store.setParada();
   vibrate([200, 100, 200]);
   updateButtonStates();
+  setTimeout(() => { abrirModalFotoParada(); }, 300);
+}
 
-  setTimeout(() => {
-    abrirModalFotoParada();
-  }, 300);
+// ============================================================
+// HANDLERS PAUSA / RETOMADA
+// ============================================================
+
+// Abre o modal de motivo de pausa programada.
+async function handlePausar() {
+  const m = store.measurement;
+  if (m.state === 'paused') return;
+
+  // Carrega motivos de pausa da máquina
+  currentPauseReasons = await getCurrentPauseReasons();
+
+  const modal = document.getElementById('modal-pause-reason');
+  if (!modal) return;
+  renderPauseReasonList(currentPauseReasons);
+  document.querySelectorAll('#pause-reason-list .alarm-item').forEach(el => el.classList.remove('selected'));
+  modal.classList.remove('hidden');
+}
+
+// Confirma o motivo de pausa e registra a pausa no store.
+function handleConfirmPauseReason() {
+  const selected = document.querySelector('#pause-reason-list .alarm-item.selected');
+  const customInput = document.getElementById('custom-pause-reason-input');
+
+  let reason = 'Pausa programada';
+
+  if (selected) {
+    reason = selected.dataset.name;
+  } else if (customInput?.value.trim()) {
+    reason = customInput.value.trim();
+    if (!currentPauseReasons.includes(reason)) {
+      currentPauseReasons.push(reason);
+      salvarMotivosPausa(currentPauseReasons);
+      renderPauseReasonList(currentPauseReasons);
+    }
+  }
+
+  if (customInput) customInput.value = '';
+  document.getElementById('modal-pause-reason')?.classList.add('hidden');
+
+  store.setPausa(reason);
+  vibrate([100, 50, 100]);
+  updateButtonStates();
+}
+
+// Retoma a medição após pausa programada.
+function handleRetomar() {
+  store.setRetomada();
+  vibrate([100]);
+  updateButtonStates();
+}
+
+// ============================================================
+// MOTIVOS DE PAUSA — carregados/salvos na máquina
+// ============================================================
+
+async function getCurrentPauseReasons() {
+  const linhaId = store.config.linhaId;
+  const maquinaId = store.config.maquinaLinhaId;
+  if (!linhaId || !maquinaId) return [];
+  try {
+    const maquinas = await api.listarMaquinas(linhaId);
+    const maquina = maquinas.find(m => Number(m.id) === Number(maquinaId));
+    if (maquina?.pausas_programadas) {
+      const parsed = JSON.parse(maquina.pausas_programadas);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch { /* ignora */ }
+  return [];
+}
+
+async function salvarMotivosPausa(motivos) {
+  const linhaId = store.config.linhaId;
+  const maquinaId = store.config.maquinaLinhaId;
+  if (!linhaId || !maquinaId) return;
+  try {
+    await api.atualizarMaquina(linhaId, maquinaId, { pausas_programadas: JSON.stringify(motivos) });
+  } catch { /* silencioso */ }
+}
+
+function renderPauseReasonList(reasons) {
+  const list = document.getElementById('pause-reason-list');
+  if (!list) return;
+  if (reasons.length === 0) {
+    list.innerHTML = '<p style="font-size:0.8rem;color:var(--text-dim);text-align:center;padding:8px 0;">Nenhum motivo cadastrado</p>';
+    return;
+  }
+  list.innerHTML = reasons.map(r => `
+    <div class="alarm-item" data-name="${r}">${r}</div>
+  `).join('');
+  list.querySelectorAll('.alarm-item').forEach(el => {
+    el.addEventListener('click', () => {
+      list.querySelectorAll('.alarm-item').forEach(e => e.classList.remove('selected'));
+      el.classList.add('selected');
+    });
+  });
 }
 
 // ============================================================
@@ -656,11 +720,9 @@ function abrirModalFotoParada() {
     <div class="modal" style="text-align:center;">
       <h3>Registrar foto</h3>
       <p class="modal-sub">Deseja registrar uma foto desta parada?</p>
-
       <div id="foto-preview-container" class="hidden" style="margin-bottom:16px;">
         <img id="foto-preview" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm);object-fit:contain;" alt="Preview">
       </div>
-
       <label for="foto-input" style="display:flex;align-items:center;justify-content:center;gap:8px;
         background:var(--brand);border:none;border-radius:var(--radius-sm);
         padding:16px;cursor:pointer;margin-bottom:16px;color:#fff;font-size:0.875rem;font-weight:500;
@@ -669,13 +731,8 @@ function abrirModalFotoParada() {
         Tirar foto ou selecionar
       </label>
       <input type="file" id="foto-input" accept="image/*" capture="environment" style="display:none;">
-
-      <button class="btn btn-primary btn-block" id="btn-enviar-foto" style="display:none;margin-bottom:8px;">
-        Enviar foto
-      </button>
-      <button class="btn btn-outline btn-block" id="btn-pular-foto">
-        Pular
-      </button>
+      <button class="btn btn-primary btn-block" id="btn-enviar-foto" style="display:none;margin-bottom:8px;">Enviar foto</button>
+      <button class="btn btn-outline btn-block" id="btn-pular-foto">Pular</button>
     </div>
   `;
   document.body.appendChild(modal);
@@ -696,23 +753,15 @@ function abrirModalFotoParada() {
   btnEnviar.addEventListener('click', async () => {
     const file = input.files[0];
     if (!file) return;
-
     const medicaoId = store.measurement.medicaoId;
     const m = store.measurement;
     const lastStop = [...m.events].reverse().find(e => e.type === 'stop');
     const eventoId = lastStop?.backendId;
-
     if (!medicaoId || !eventoId) { modal.remove(); return; }
-
     btnEnviar.textContent = 'Enviando...';
     btnEnviar.disabled = true;
-
-    try {
-      await api.uploadFotoEvento(medicaoId, eventoId, file);
-    } catch (e) {
-      console.warn('[foto] Erro ao enviar foto:', e);
-    }
-
+    try { await api.uploadFotoEvento(medicaoId, eventoId, file); }
+    catch (e) { console.warn('[foto] Erro ao enviar foto:', e); }
     modal.remove();
   });
 
@@ -728,7 +777,6 @@ async function getCurrentMachineAlarms() {
   const linhaId = store.config.linhaId;
   const maquinaId = store.config.maquinaLinhaId;
   let alarms = Array.isArray(store.config.alarms) ? store.config.alarms : [];
-
   if (linhaId && maquinaId) {
     try {
       const maquinas = await api.listarMaquinas(linhaId);
@@ -739,7 +787,6 @@ async function getCurrentMachineAlarms() {
       }
     } catch { /* ignora */ }
   }
-
   currentMachineAlarms = alarms;
   return alarms;
 }
@@ -796,16 +843,14 @@ function handleConfirmReason() {
   } else if (customInput && customInput.value.trim()) {
     reason = customInput.value.trim();
     category = categorySelect?.value || 'Interna';
-
     if (!currentMachineAlarms.some(a => a.name === reason)) {
       currentMachineAlarms.push({ name: reason, category });
       renderAlarmList(currentMachineAlarms);
-
       const linhaId = store.config.linhaId;
       const maquinaId = store.config.maquinaLinhaId;
       if (linhaId && maquinaId) {
         api.atualizarMaquina(linhaId, maquinaId, { alarmes: JSON.stringify(currentMachineAlarms) }).catch(err => {
-          console.warn('Não foi possível salvar alarme de máquina:', err);
+          console.warn('Não foi possível salvar alarme:', err);
         });
       }
     }
@@ -821,16 +866,45 @@ function handleConfirmReason() {
 }
 
 // ============================================================
-// ATUALIZAÇÃO VISUAL DOS BOTÕES
+// ATUALIZAÇÃO VISUAL DOS BOTÕES E ESTADO
 // ============================================================
 
+// Atualiza badge, label do timer e estado visual dos botões marcha/parada.
+// Durante pausa: botões ficam opacos e desabilitados, badge âmbar.
 function updateButtonStates() {
   const m = store.measurement;
   const marchaBtn  = document.getElementById('btn-marcha');
   const paradaBtn  = document.getElementById('btn-parada');
   const stateLabel = document.getElementById('med-state-label');
   const badge      = document.getElementById('med-status-badge');
+  const btnPausar  = document.getElementById('btn-pausar');
+  const btnRetomar = document.getElementById('btn-retomar-pausa');
+
   if (!stateLabel || !badge) return;
+
+  const isPaused = m.state === 'paused';
+
+  // Botão Pausar / Retomar — alterna conforme estado
+  if (btnPausar) btnPausar.style.display = isPaused ? 'none' : '';
+  if (btnRetomar) btnRetomar.style.display = isPaused ? '' : 'none';
+
+  // Botões marcha/parada — opacos e desabilitados durante pausa
+  if (marchaBtn) {
+    marchaBtn.style.opacity = isPaused ? '0.4' : '1';
+    marchaBtn.style.pointerEvents = isPaused ? 'none' : '';
+  }
+  if (paradaBtn) {
+    paradaBtn.style.opacity = isPaused ? '0.4' : '1';
+    paradaBtn.style.pointerEvents = isPaused ? 'none' : '';
+  }
+
+  if (isPaused) {
+    stateLabel.textContent = 'Pausado';
+    stateLabel.className = 'med-timer-label paused';
+    badge.textContent = 'Pausado';
+    badge.className = 'badge badge-amber';
+    return;
+  }
 
   if (m.state === 'running') {
     marchaBtn?.classList.add('active');
@@ -860,7 +934,10 @@ export function updateMedicao() {
   const timerEl = document.getElementById('med-timer');
   if (!timerEl) return;
 
-  timerEl.textContent = formatTime(store.getElapsedMs());
+  // Timer congela durante pausa
+  if (m.state !== 'paused') {
+    timerEl.textContent = formatTime(store.getElapsedMs());
+  }
 
   const stopCountEl = document.getElementById('med-stop-count');
   if (stopCountEl) stopCountEl.textContent = store.getStops().length;
@@ -885,36 +962,28 @@ export function updateMedicao() {
 
 function showFinalizeModal() {
   const tipo = store.measurement.tipo || 'manual';
-
-  // No modo semi-automático, não exige input de produção final —
-  // a produção vem do último evento registrado pelo wise_processor
   const modalFinalize = document.getElementById('modal-finalize');
   if (!modalFinalize) return;
 
-  if (tipo === 'semiautomatico') {
-    // Oculta o campo de produção final — não é necessário no semi-auto
-    const prodFinalGroup = modalFinalize.querySelector('#final-production-group');
-    if (prodFinalGroup) prodFinalGroup.style.display = 'none';
-  } else {
+  const prodFinalGroup = modalFinalize.querySelector('#final-production-group');
+  if (prodFinalGroup) {
+    prodFinalGroup.style.display = tipo === 'semiautomatico' ? 'none' : '';
+  }
+
+  if (tipo === 'manual') {
     const lastReading = store.getLastReading();
     const input = document.getElementById('final-production-input');
     if (input && lastReading) input.placeholder = `Última leitura: ${lastReading.value}`;
-    const prodFinalGroup = modalFinalize.querySelector('#final-production-group');
-    if (prodFinalGroup) prodFinalGroup.style.display = '';
   }
 
   modalFinalize.classList.remove('hidden');
 }
 
-// Finaliza a medição.
-// No modo semi-automático, busca a produção do último evento de produção do backend.
-// No modo manual, usa o valor informado pelo auditor.
 async function handleFinalize(tipo = 'manual') {
   window._clearShiftEndCountdown?.();
   if (_semiAutoSyncInterval) { clearInterval(_semiAutoSyncInterval); _semiAutoSyncInterval = null; }
 
   if (tipo === 'semiautomatico') {
-    // Busca a produção do último evento de produção registrado pelo wise_processor
     try {
       const medicao = await api.getMedicao(store.measurement.medicaoId);
       const ultimaProducao = (medicao?.eventos || [])
@@ -923,7 +992,7 @@ async function handleFinalize(tipo = 'manual') {
       if (ultimaProducao?.producao_leitura != null) {
         store.addProductionReading(ultimaProducao.producao_leitura);
       }
-    } catch { /* silencioso — finaliza mesmo sem leitura de produção */ }
+    } catch { /* silencioso */ }
   } else {
     const input = document.getElementById('final-production-input');
     const value = parseInt(input.value);

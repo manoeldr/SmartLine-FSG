@@ -5,13 +5,12 @@
 
 /* ── Timer central ──────────────────────────────────────── */
 
-/* Bloco principal do timer */
 .med-timer {
   text-align: center;
   padding: 40px 0 32px;
 }
 
-/* Label de estado — RODANDO / PARADO */
+/* Label de estado — RODANDO / PARADO / PAUSADO */
 .med-timer-label {
   display: block;
   font-size: 0.625rem;
@@ -24,6 +23,7 @@
 
 .med-timer-label.running { color: var(--green); }
 .med-timer-label.stopped { color: var(--red); }
+.med-timer-label.paused  { color: var(--amber); }
 
 /* Valor do timer — fonte fina e elegante estilo display */
 .med-timer-value {
@@ -48,7 +48,6 @@
 
 /* ── Botões Marcha / Parada ──────────────────────────────── */
 
-/* Grid de dois botões lado a lado */
 .med-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -56,7 +55,6 @@
   margin-bottom: 24px;
 }
 
-/* Botão base — grande, totalmente arredondado, ícone maior */
 .med-btn {
   display: flex;
   flex-direction: column;
@@ -74,13 +72,11 @@
   letter-spacing: 0.3px;
 }
 
-/* Ícones maiores dentro dos botões */
 .med-btn svg {
   width: 36px;
   height: 36px;
 }
 
-/* Feedback de toque */
 .med-btn:active { transform: scale(0.94); }
 
 /* Botão Marcha */
@@ -113,14 +109,12 @@
 
 /* ── Contadores do turno ────────────────────────────────── */
 
-/* Grid 2x2 */
 .med-counters {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
 
-/* Card individual — sem borda, fundo limpo */
 .med-counter {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -130,7 +124,6 @@
   box-shadow: var(--shadow);
 }
 
-/* Valor numérico */
 .med-counter-value {
   display: block;
   font-size: 1.5rem;
@@ -140,7 +133,6 @@
   letter-spacing: -0.5px;
 }
 
-/* Label descritivo */
 .med-counter-label {
   display: block;
   font-size: 0.5625rem;
@@ -159,7 +151,7 @@
     grid-template-columns: repeat(4, 1fr) !important;
     gap: 16px;
   }
-  
+
   .med-buttons {
     max-width: 800px;
     margin: 0 auto 32px auto;

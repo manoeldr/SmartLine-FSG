@@ -1,8 +1,5 @@
 // ============================================================
 // MAIN.JS — Ponto de entrada do aplicativo
-// Gerencia autenticação, navegação entre páginas, carregamento
-// dinâmico de HTML e inicialização dos módulos de cada tela.
-// Também roda o tick global (1x por segundo) pra atualizar timers.
 // ============================================================
 
 import { initOverview, updateOverview } from './overview.js';
@@ -19,16 +16,12 @@ const navbar = document.getElementById('navbar');
 const btnThemeToggle = document.getElementById('btn-theme-toggle');
 const btnLogout = document.getElementById('btn-logout');
 let currentPage = null;
-
-// Usuário autenticado — carregado do sessionStorage
 let usuarioAtual = null;
 
 // ============================================================
 // AUTENTICAÇÃO
 // ============================================================
 
-// Verifica se há sessão ativa no sessionStorage.
-// Se houver token, valida com o backend. Se não houver, mostra login.
 async function iniciarApp() {
   const token = sessionStorage.getItem('smartline_token');
   const usuarioSalvo = sessionStorage.getItem('smartline_usuario');
@@ -48,7 +41,6 @@ async function iniciarApp() {
   }
 }
 
-// Exibe a tela de login e esconde navbar, tema e logout.
 function mostrarLogin() {
   navbar?.classList.add('hidden');
   if (btnThemeToggle) btnThemeToggle.style.display = 'none';
@@ -56,7 +48,6 @@ function mostrarLogin() {
   loadPageLogin();
 }
 
-// Carrega e inicializa a tela de login.
 async function loadPageLogin() {
   currentPage = 'login';
   navButtons.forEach(btn => btn.classList.remove('active'));
@@ -73,14 +64,10 @@ async function loadPageLogin() {
   }
 }
 
-// Entra no app após login bem sucedido.
-// Valida se a medição salva no store ainda pertence a este usuário.
-// Se não pertencer ou já estiver finalizada, reseta o store.
 async function entrarNoApp(usuario) {
   navbar?.classList.remove('hidden');
   if (btnThemeToggle) btnThemeToggle.style.display = '';
 
-  // Exibe e configura o botão de logout
   if (btnLogout) {
     btnLogout.style.display = 'flex';
     btnLogout.onclick = () => abrirModalLogout();
@@ -88,18 +75,14 @@ async function entrarNoApp(usuario) {
 
   aplicarPermissoesNavbar(usuario.nivel);
 
-  // Valida medição ativa no store — evita que outro usuário
-  // veja modais de produção de uma medição que não é dele
   const m = store.measurement;
   if (m.active && m.medicaoId) {
     try {
       const med = await api.getMedicao(m.medicaoId);
-      // Reseta se a medição foi finalizada ou pertence a outro usuário
       if (med.timestamp_fim || med.usuario_nome !== usuario.nome) {
         store.resetMeasurement();
       }
     } catch {
-      // Medição não encontrada no backend — reseta o store
       store.resetMeasurement();
     }
   }
@@ -113,7 +96,6 @@ async function entrarNoApp(usuario) {
   loadPage(paginaInicial);
 }
 
-// Mostra/oculta botões da navbar conforme o nível do usuário.
 function aplicarPermissoesNavbar(nivel) {
   navButtons.forEach(btn => {
     const page = btn.dataset.page;
@@ -127,7 +109,6 @@ function aplicarPermissoesNavbar(nivel) {
   });
 }
 
-// Abre o modal de confirmação de logout.
 function abrirModalLogout() {
   const existing = document.getElementById('modal-logout');
   if (existing) return;
@@ -145,15 +126,11 @@ function abrirModalLogout() {
   `;
   document.body.appendChild(modal);
 
-  document.getElementById('btn-confirmar-logout').addEventListener('click', () => {
-    modal.remove();
-    logout();
-  });
+  document.getElementById('btn-confirmar-logout').addEventListener('click', () => { modal.remove(); logout(); });
   document.getElementById('btn-cancelar-logout').addEventListener('click', () => modal.remove());
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
 }
 
-// Realiza o logout — limpa sessão e volta para login.
 function logout() {
   sessionStorage.removeItem('smartline_token');
   sessionStorage.removeItem('smartline_usuario');
@@ -165,16 +142,9 @@ function logout() {
   mostrarLogin();
 }
 
-// Ouve o evento de logout disparado pela api.js (token inválido).
 window.addEventListener('auth:logout', logout);
-
-// Expõe logout globalmente para uso em outras telas.
 window.smartlineLogout = logout;
-
-// Expõe usuário atual globalmente.
-Object.defineProperty(window, 'usuarioAtual', {
-  get: () => usuarioAtual,
-});
+Object.defineProperty(window, 'usuarioAtual', { get: () => usuarioAtual });
 
 // ============================================================
 // NAVEGAÇÃO
@@ -201,12 +171,10 @@ async function loadPage(name) {
     }
   } catch (e) {
     if (currentPage !== name) return;
-    console.error('Erro ao carregar página:', e);
     container.innerHTML = `<div class="empty-state"><p>Erro ao carregar página</p></div>`;
   }
 }
 
-// Configura os botões da navbar para navegar entre páginas.
 navButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     const page = btn.dataset.page;
@@ -257,13 +225,28 @@ function startShiftEndCountdown() {
 
 window._clearShiftEndCountdown = clearShiftEndCountdown;
 
+// Inicializa os listeners dos modais globais.
+// O campo de refugo no modal de produção periódica só aparece se
+// store.config.temRefugo for true para a máquina em medição.
 function initGlobalModals() {
   document.getElementById('btn-confirm-production')?.addEventListener('click', () => {
-    const input = document.getElementById('production-input');
-    const value = parseInt(input.value);
-    if (isNaN(value) || value < 0) { input.style.borderColor = 'var(--red)'; return; }
-    store.addProductionReading(value);
-    input.value = ''; input.style.borderColor = '';
+    const inputProd = document.getElementById('production-input');
+    const inputRefugo = document.getElementById('refugo-input');
+
+    const valueProd = parseInt(inputProd.value);
+    if (isNaN(valueProd) || valueProd < 0) {
+      inputProd.style.borderColor = 'var(--red)';
+      return;
+    }
+
+    const valueRefugo = inputRefugo?.value.trim() !== '' ? parseInt(inputRefugo.value) : null;
+
+    store.addProductionReading(valueProd, valueRefugo);
+
+    inputProd.value = '';
+    inputProd.style.borderColor = '';
+    if (inputRefugo) { inputRefugo.value = ''; inputRefugo.style.borderColor = ''; }
+
     document.getElementById('modal-production')?.classList.add('hidden');
     vibrate([50]);
   });
@@ -315,13 +298,6 @@ function initThemeToggle() {
 // TICK GLOBAL
 // ============================================================
 
-// Roda a cada 1 segundo para atualizar timers e verificar condições periódicas.
-// Modais de produção e fim de turno só disparam se a medição ativa
-// pertence ao usuário logado neste dispositivo.
-//
-// O modal de produção usa slots fixos ancorados no início da medição:
-// slot 1 = 1º intervalo completo, slot 2 = 2º intervalo, etc.
-// Isso garante que o próximo disparo nunca se atrasa pelo tempo de resposta.
 setInterval(() => {
   if (currentPage === 'overview') updateOverview();
   if (currentPage === 'medicao')  updateMedicao();
@@ -330,15 +306,25 @@ setInterval(() => {
     if (store.shouldPromptProduction()) {
       vibrate([300, 100, 300, 100, 300]);
 
-      // Avança o slot para o atual, sem usar Date.now() como referência
       const intervalMs = (store.config.productionInterval || 60) * 60 * 1000;
       const elapsed = Date.now() - new Date(store.measurement.startTime).getTime();
       store.measurement.lastProductionSlot = Math.floor(elapsed / intervalMs);
       store.save();
 
       const lastReading = store.getLastReading();
-      const input = document.getElementById('production-input');
-      if (input) input.placeholder = lastReading ? `Última: ${lastReading.value}` : 'Ex: 4500';
+      const inputProd = document.getElementById('production-input');
+      const inputRefugo = document.getElementById('refugo-input');
+      const refugoGroup = document.getElementById('refugo-group');
+
+      if (inputProd) inputProd.placeholder = lastReading ? `Última: ${lastReading.value}` : 'Ex: 4500';
+
+      // Mostra o campo de refugo apenas se a máquina tiver essa opção habilitada
+      const temRefugo = store.config.temRefugo || false;
+      if (refugoGroup) refugoGroup.style.display = temRefugo ? '' : 'none';
+      if (inputRefugo && temRefugo) {
+        inputRefugo.placeholder = lastReading?.refugo != null ? `Último: ${lastReading.refugo}` : 'Ex: 12';
+      }
+
       document.getElementById('modal-production')?.classList.remove('hidden');
     }
 
@@ -360,10 +346,8 @@ store.applyTheme();
 initGlobalModals();
 initThemeToggle();
 
-// Oculta navbar, tema e logout até autenticar
 navbar?.classList.add('hidden');
 if (btnThemeToggle) btnThemeToggle.style.display = 'none';
 if (btnLogout) btnLogout.style.display = 'none';
 
-// Verifica sessão e inicia o app
 iniciarApp();

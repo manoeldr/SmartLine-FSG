@@ -3,8 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, text
 from backend.database import engine, Base
 
-# Models — devem ser importados antes das routes para o SQLAlchemy e Pydantic
-# resolverem todos os tipos corretamente
 import backend.models.medicao
 import backend.models.evento
 import backend.models.cliente
@@ -16,7 +14,6 @@ import backend.models.semiauto.wise_channel
 import backend.models.semiauto.wise_formula
 import backend.models.semiauto.wise_raw
 
-# Routes — importadas após os models
 from backend.routes.medicoes import router as medicoes_router
 from backend.routes.eventos import router as eventos_router
 from backend.routes.clientes import router as clientes_router
@@ -35,7 +32,6 @@ Base.metadata.create_all(bind=engine)
 
 # ============================================================
 # MIGRAÇÕES — compatibilidade sem Alembic
-# Adiciona colunas novas em tabelas existentes sem recriar o banco
 # ============================================================
 
 inspector = inspect(engine)
@@ -58,6 +54,28 @@ if 'maquinas_linha' in inspector.get_table_names():
         with engine.connect() as conn:
             try:
                 conn.execute(text('ALTER TABLE maquinas_linha ADD COLUMN sobrevelocidade FLOAT'))
+                conn.commit()
+            except Exception:
+                pass
+
+# Migração: pausas_programadas em maquinas_linha
+if 'maquinas_linha' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('maquinas_linha')]
+    if 'pausas_programadas' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text('ALTER TABLE maquinas_linha ADD COLUMN pausas_programadas VARCHAR(2000)'))
+                conn.commit()
+            except Exception:
+                pass
+
+# Migração: tem_refugo em maquinas_linha
+if 'maquinas_linha' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('maquinas_linha')]
+    if 'tem_refugo' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text('ALTER TABLE maquinas_linha ADD COLUMN tem_refugo BOOLEAN DEFAULT 0'))
                 conn.commit()
             except Exception:
                 pass
@@ -109,6 +127,17 @@ if 'medicoes' in inspector.get_table_names():
         with engine.connect() as conn:
             try:
                 conn.execute(text("ALTER TABLE medicoes ADD COLUMN tipo VARCHAR DEFAULT 'manual'"))
+                conn.commit()
+            except Exception:
+                pass
+
+# Migração: refugo_leitura em eventos
+if 'eventos' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('eventos')]
+    if 'refugo_leitura' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text('ALTER TABLE eventos ADD COLUMN refugo_leitura INTEGER'))
                 conn.commit()
             except Exception:
                 pass

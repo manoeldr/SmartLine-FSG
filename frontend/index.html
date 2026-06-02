@@ -45,13 +45,22 @@
     </nav>
   </div>
 
-  <!-- MODAL GLOBAL: PRODUÇÃO PERIÓDICA -->
+<!-- MODAL GLOBAL: PRODUÇÃO PERIÓDICA -->
+  <!-- Disparado automaticamente a cada X minutos durante medição ativa. -->
+  <!-- O campo de refugo só aparece se a máquina tiver "Controla refugo" habilitado. -->
   <div class="modal-overlay hidden" id="modal-production">
     <div class="modal">
       <h3>Informe a produção</h3>
       <p class="modal-sub">Valor atual do contador da máquina</p>
-      <input type="number" id="production-input" placeholder="Ex: 4500" class="input input-lg" inputmode="numeric">
-      <button class="btn btn-primary" id="btn-confirm-production">Confirmar</button>
+      <div class="form-group">
+        <label>Produção atual <span style="color:var(--red)">*</span></label>
+        <input type="number" id="production-input" placeholder="Ex: 4500" class="input input-lg" inputmode="numeric">
+      </div>
+      <div class="form-group" id="refugo-group" style="margin-top:12px;display:none;">
+        <label>Refugo acumulado <span style="font-size:0.7rem;color:var(--text-dim);font-weight:400;">(opcional)</span></label>
+        <input type="number" id="refugo-input" placeholder="Ex: 12" class="input input-lg" inputmode="numeric">
+      </div>
+      <button class="btn btn-primary btn-block" id="btn-confirm-production" style="margin-top:4px;">Confirmar</button>
     </div>
   </div>
 

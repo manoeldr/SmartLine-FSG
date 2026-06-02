@@ -1,8 +1,5 @@
 // ============================================================
 // OVERVIEW.JS — Tela de visão geral da linha de produção
-// Mostra fluxo da linha, KPIs da máquina crítica e modal
-// de detalhes por máquina. Suporta dados em tempo real e histórico.
-// Cálculos de indicadores delegados ao backend (calculations.py).
 // ============================================================
 
 import { store } from './store.js';
@@ -18,15 +15,12 @@ let filtrosAtivos = {};
 let lastFluxoUpdateTime = 0;
 let linhaAtualId = null;
 
-// Intervalo de atualização do fluxo da linha em milissegundos (30s).
 const FLUXO_UPDATE_INTERVAL_MS = 30_000;
 
 // ============================================================
 // INICIALIZAÇÃO
 // ============================================================
 
-// Inicializa a tela de overview: detecta a linha ativa, carrega filtros,
-// renderiza o fluxo da linha e os KPIs da máquina crítica.
 export async function initOverview() {
   productionChart = null;
   modalPieChart = null;
@@ -47,8 +41,6 @@ export async function initOverview() {
   lastFluxoUpdateTime = Date.now();
 }
 
-// Tenta detectar automaticamente uma linha ativa buscando medições em andamento.
-// Fallback: usa a primeira linha do primeiro cliente cadastrado.
 async function detectarLinhaAtiva() {
   try {
     const medicoes = await api.listarMedicoes({});
@@ -64,8 +56,6 @@ async function detectarLinhaAtiva() {
   return null;
 }
 
-// Tick periódico chamado pelo main.js a cada segundo.
-// Atualiza o relógio e, a cada 30s, recarrega o fluxo e os KPIs da crítica.
 export async function updateOverview() {
   atualizarClock();
   const now = Date.now();
@@ -80,10 +70,8 @@ export async function updateOverview() {
 // CLOCK
 // ============================================================
 
-// Inicia o relógio da tela de overview.
 function iniciarClock() { atualizarClock(); }
 
-// Atualiza o elemento de relógio com o horário atual no formato HH:MM.
 function atualizarClock() {
   const el = document.getElementById('ov-clock');
   if (el) el.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -93,7 +81,6 @@ function atualizarClock() {
 // FILTROS
 // ============================================================
 
-// Busca as opções de filtro disponíveis (máquinas, turnos, datas) e popula os selects do painel.
 async function inicializarFiltros() {
   const linhaId = linhaAtualId;
   if (!linhaId) return;
@@ -138,7 +125,6 @@ async function inicializarFiltros() {
   } catch { /* silencioso */ }
 }
 
-// Configura os eventos do painel de filtros: abrir/fechar, aplicar e limpar.
 function configurarFiltroUI() {
   const filterBtn = document.getElementById('ov-filter-btn');
   const filterPanel = document.getElementById('ov-filter-panel');
@@ -177,9 +163,6 @@ function configurarFiltroUI() {
 // DADOS DA MÁQUINA CRÍTICA
 // ============================================================
 
-// Busca o status da linha e exibe os KPIs da máquina crítica.
-// Se não houver máquina crítica definida, limpa os KPIs.
-// Aplica os filtros ativos ao buscar medições e indicadores.
 async function carregarDadosCritica() {
   const linhaId = linhaAtualId;
   if (!linhaId) {
@@ -238,8 +221,6 @@ async function carregarDadosCritica() {
   }
 }
 
-// Preenche os elementos de indicadores (MTBF, MTTR, disponibilidade, performance, OEE)
-// com os valores retornados pelo backend.
 function exibirIndicadores(ind) {
   document.getElementById('ov-total-stops').textContent = ind.num_paradas ?? '—';
   document.getElementById('ov-mtbf').textContent = ind.mtbf_ms ? formatTimeMM(ind.mtbf_ms) : '—';
@@ -249,7 +230,6 @@ function exibirIndicadores(ind) {
   document.getElementById('ov-oee').textContent = formatPercent(ind.oee ?? 0);
 }
 
-// Limpa todos os KPIs da máquina crítica exibindo '—' em cada campo.
 function limparKPIs() {
   ['ov-vel-nominal', 'ov-production', 'ov-efficiency', 'ov-total-stops'].forEach(id => {
     const el = document.getElementById(id); if (el) el.textContent = '—';
@@ -257,7 +237,6 @@ function limparKPIs() {
   limparIndicadores();
 }
 
-// Limpa apenas os indicadores calculados (MTBF, MTTR, disponibilidade, performance, OEE).
 function limparIndicadores() {
   ['ov-mtbf', 'ov-mttr', 'ov-availability', 'ov-performance', 'ov-oee'].forEach(id => {
     const el = document.getElementById(id); if (el) el.textContent = '—';
@@ -265,12 +244,9 @@ function limparIndicadores() {
 }
 
 // ============================================================
-// GRÁFICO DE BARRAS — PRODUÇÃO TEMPO REAL
+// GRÁFICO DE BARRAS — PRODUÇÃO
 // ============================================================
 
-// Renderiza o gráfico de barras de produção real vs nominal ao longo do tempo.
-// Usa Chart.js. Se o gráfico já existir, atualiza os dados sem recriar.
-// Exibe mensagem de "sem leituras" se não houver eventos de produção.
 function renderBarChart(medicao) {
   const canvas = document.getElementById('ov-production-chart');
   const emptyEl = document.getElementById('ov-chart-empty');
@@ -361,10 +337,6 @@ function renderBarChart(medicao) {
 // FLUXO DA LINHA
 // ============================================================
 
-// Busca o status de todas as máquinas da linha e renderiza o fluxo visual.
-// Cada máquina exibe estado (rodando/parado/sem_informação), eficiência e abreviação.
-// Máquinas críticas recebem um ★ e máquinas semi-automáticas recebem badge "IOT".
-// Ao clicar em uma máquina, abre o modal de detalhes.
 async function renderFluxoLinha() {
   const container = document.getElementById('ov-fluxo-linha');
   if (!container) return;
@@ -388,12 +360,10 @@ async function renderFluxoLinha() {
       const estado = m.estado;
       const efText = m.eficiencia !== null ? `${m.eficiencia}%` : '—';
 
-      // Badge ★ para máquina crítica (canto superior esquerdo do box)
       const criticaStar = m.critica
         ? '<span style="position:absolute;top:3px;left:5px;color:var(--brand);font-size:0.6rem;font-weight:700;">★</span>'
         : '';
 
-      // Badge "IOT" para máquinas semi-automáticas (canto inferior direito do box)
       const badgeSemiAuto = m.tipo === 'semiautomatico'
         ? '<span style="position:absolute;bottom:3px;right:4px;font-size:0.45rem;font-weight:700;color:var(--brand);letter-spacing:0.3px;line-height:1;">IOT</span>'
         : '';
@@ -434,10 +404,6 @@ async function renderFluxoLinha() {
 // MODAL: DETALHES DA MÁQUINA
 // ============================================================
 
-// Abre o modal de detalhes de uma máquina específica.
-// Exibe KPIs, gráfico de paradas (donut) e timeline de eventos recentes.
-// O subtítulo mostra o auditor (medição manual) ou "Semi Auto" (medição semi-automática).
-// Busca a medição mais recente da máquina e calcula os indicadores via backend.
 async function abrirModalMaquina(maquina) {
   const modal = document.getElementById('modal-maquina-detalhes');
   if (!modal) return;
@@ -493,7 +459,6 @@ async function abrirModalMaquina(maquina) {
     if (medicoes.length > 0) {
       const medicao = medicoes[0];
 
-      // Atualiza subtítulo com auditor/tipo e data da medição
       const subEl = document.getElementById('modal-maq-sub');
       if (subEl) {
         const dataRef = medicao.timestamp_fim || medicao.timestamp_inicio;
@@ -503,12 +468,10 @@ async function abrirModalMaquina(maquina) {
         });
 
         if (maquina.estado === 'rodando' || maquina.estado === 'parado') {
-          // Medição ativa — mostra auditor e tipo (Semi Auto se aplicável)
           const auditor = medicao.usuario_nome || '—';
           const tipoStr = medicao.tipo === 'semiautomatico' ? ' · Semi Auto' : '';
           subEl.textContent = `Medindo: ${auditor}${tipoStr} · desde ${dataStr}`;
         } else {
-          // Última medição finalizada — mostra status e data
           subEl.textContent = `${statusLabels[maquina.estado] || '—'} · ${dataStr}`;
         }
       }
@@ -523,16 +486,12 @@ async function abrirModalMaquina(maquina) {
   }
 }
 
-// Fecha o modal de detalhes da máquina e destrói o gráfico donut se existir.
 function fecharModal() {
   document.getElementById('modal-maquina-detalhes')?.classList.add('hidden');
   document.body.classList.remove('modal-open');
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
 }
 
-// Renderiza o gráfico donut de paradas por motivo no modal.
-// Usa os indicadores calculados pelo backend. Exibe legenda com tempo e percentual.
-// Se não houver paradas, exibe mensagem de "nenhuma parada registrada".
 function renderModalDonutFromIndicadores(ind, medicao) {
   const canvas = document.getElementById('modal-maq-pie');
   const legend = document.getElementById('modal-maq-pie-legend');
@@ -601,10 +560,12 @@ function renderModalDonutFromIndicadores(ind, medicao) {
   }).join('');
 }
 
-// Renderiza a timeline de eventos recentes no modal de detalhes.
-// Inclui eventos sintéticos de início e fim da medição.
-// Exibe ícone, hora, label, motivo/valor e duração de cada evento.
-// Eventos de foto exibem um botão para abrir o visualizador de imagem.
+// ============================================================
+// TIMELINE DE EVENTOS DO MODAL
+// Inclui parada, marcha, produção, pausa programada e retomada.
+// Pausas aparecem em roxo com motivo da pausa.
+// ============================================================
+
 function renderModalEventos(eventos, medicao) {
   const container = document.getElementById('modal-maq-eventos');
   const noEventos = document.getElementById('modal-maq-no-eventos');
@@ -628,8 +589,9 @@ function renderModalEventos(eventos, medicao) {
 
   const todosEventos = [eventoInicio, ...eventos, ...eventosFim];
 
+  // Inclui pausa e retomada na lista de eventos relevantes
   const relevantes = [...todosEventos]
-    .filter(e => ['parada', 'marcha', 'producao', 'inicio', 'fim'].includes(e.tipo))
+    .filter(e => ['parada', 'marcha', 'producao', 'inicio', 'fim', 'pausa', 'retomada'].includes(e.tipo))
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   if (relevantes.length === 0) {
@@ -649,6 +611,10 @@ function renderModalEventos(eventos, medicao) {
     parada: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`,
     marcha: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
     producao: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    // Ícone de pausa — dois traços verticais
+    pausa: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`,
+    // Ícone de retomada — seta para frente
+    retomada: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
   };
 
   const labelPorTipo = {
@@ -657,19 +623,35 @@ function renderModalEventos(eventos, medicao) {
     parada: 'Parada',
     marcha: 'Rodando',
     producao: 'Produção',
+    pausa: 'Pausa programada',
+    retomada: 'Retomada',
+  };
+
+  // Cor do ícone por tipo — pausa e retomada em roxo
+  const corPorTipo = {
+    inicio: 'marcha',
+    fim: 'parada',
+    parada: 'parada',
+    marcha: 'marcha',
+    producao: 'producao',
+    pausa: 'pausa',
+    retomada: 'pausa',
   };
 
   container.innerHTML = relevantes.map(ev => {
     const hora = new Date(ev.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const icone = iconePorTipo[ev.tipo] || '';
     const label = labelPorTipo[ev.tipo] || ev.tipo;
+    const cor = corPorTipo[ev.tipo] || ev.tipo;
 
     let motivo = '';
     if (ev.tipo === 'parada') motivo = ev.motivo || 'Sem informação';
-    if (ev.tipo === 'marcha') motivo = 'Retomada';
+    if (ev.tipo === 'marcha') motivo = 'Retomada da produção';
     if (ev.tipo === 'producao') motivo = `${ev.producao_leitura?.toLocaleString('pt-BR') || '—'} un`;
     if (ev.tipo === 'inicio') motivo = ev.producao_leitura !== null ? `Produção inicial: ${ev.producao_leitura?.toLocaleString('pt-BR')} un` : '';
     if (ev.tipo === 'fim') motivo = ev.producao_leitura !== null ? `Produção final: ${ev.producao_leitura?.toLocaleString('pt-BR')} un` : '';
+    if (ev.tipo === 'pausa') motivo = ev.motivo || 'Pausa programada';
+    if (ev.tipo === 'retomada') motivo = 'Retomada após pausa';
 
     let duracao = '';
     const idxCron = todosCronologicos.findIndex(e => e.timestamp === ev.timestamp && e.tipo === ev.tipo);
@@ -684,13 +666,10 @@ function renderModalEventos(eventos, medicao) {
       }
     }
 
-    const iconClass = ev.tipo === 'inicio' ? 'marcha' :
-      ev.tipo === 'fim' ? 'parada' : ev.tipo;
-
     return `
       <div class="evento-item">
         <span class="evento-hora">${hora}</span>
-        <div class="evento-icone ${iconClass}">${icone}</div>
+        <div class="evento-icone ${cor}">${icone}</div>
         <div class="evento-body">
           <div class="evento-tipo">${label}</div>
           ${motivo ? `<div class="evento-motivo">${motivo}</div>` : ''}
@@ -720,7 +699,6 @@ function renderModalEventos(eventos, medicao) {
 // MODAL: VISUALIZADOR DE FOTO
 // ============================================================
 
-// Abre o modal de visualização de foto com a imagem carregada da URL informada.
 function abrirModalFoto(url) {
   const modal = document.getElementById('modal-image-viewer');
   const img = document.getElementById('image-viewer-img');
@@ -732,7 +710,6 @@ function abrirModalFoto(url) {
   modal.onclick = (e) => { if (e.target === modal) fecharModalFoto(); };
 }
 
-// Fecha o modal de visualização de foto e limpa o src da imagem.
 function fecharModalFoto() {
   const modal = document.getElementById('modal-image-viewer');
   const img = document.getElementById('image-viewer-img');

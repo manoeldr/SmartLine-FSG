@@ -6,6 +6,7 @@ class EventoCreate(BaseModel):
     tipo: str
     motivo: str | None = None
     producao_leitura: int | None = None
+    refugo_leitura: int | None = None
 
 
 class EventoResponse(BaseModel):
@@ -15,6 +16,7 @@ class EventoResponse(BaseModel):
     timestamp: datetime
     motivo: str | None = None
     producao_leitura: int | None = None
+    refugo_leitura: int | None = None
     foto_path: str | None = None
 
     model_config = {"from_attributes": True}

@@ -1,19 +1,10 @@
 // ============================================================
 // CONFIG.JS — Tela de configuração
-// Seções: Cliente, Linha, Fluxo da linha,
-// Configuração da medição (turno)
-// Gestão de usuários (somente admin)
-// Modal de máquina: seletor Manual / Semi Automático / Automático
-//   - Manual: velocidade, sobrevelocidade, multiplicador, crítica, alarmes
-//   - Semi Automático: velocidade, sobrevelocidade, multiplicador, crítica + WISE
-//   - Automático: bloqueado (futuro)
 // ============================================================
 
 import { store } from './store.js';
 import { api } from './api.js';
 
-// Estilo base reutilizado nos botões pequenos da seção WISE.
-// Definido aqui para manter consistência sem conflitar com .btn/.btn-sm do projeto.
 const BTN_WISE = `padding:4px 10px;font-size:0.75rem;font-weight:600;background:var(--brand);border:1.5px solid var(--brand);border-radius:var(--radius-sm);color:#fff;cursor:pointer;transition:opacity 0.15s;display:inline-flex;align-items:center;gap:4px;`;
 
 let estadoConfig = {
@@ -252,7 +243,6 @@ function configurarBotaoAdicionarMaquina() {
   });
 }
 
-// Renderiza a lista de máquinas com drag-and-drop para reordenação.
 function renderMaquinas() {
   const list = document.getElementById('cfg-maquinas-list');
   if (estadoConfig.maquinas.length === 0) {
@@ -268,6 +258,7 @@ function renderMaquinas() {
         <span class="maquina-ordem">${m.ordem}</span>
         <span class="maquina-nome">${m.nome}</span>
         ${m.critica ? '<span style="color:var(--brand);font-size:1rem;margin-right:4px;">★</span>' : ''}
+        ${m.tem_refugo ? '<span style="color:var(--amber);font-size:0.65rem;margin-right:4px;" title="Controla refugo">♻</span>' : ''}
         ${faltaVar ? '<span style="color:var(--red);font-size:0.65rem;margin-right:4px;" title="Velocidade ou Sobrevelocidade pendente">⚠ config</span>' : ''}
         <button type="button" class="btn-icon config-maquina"
           data-id="${m.id}"
@@ -276,6 +267,7 @@ function renderMaquinas() {
           data-sobrevelocidade="${m.sobrevelocidade || ''}"
           data-multiplicador="${m.multiplicador_produto ?? 1}"
           data-critica="${m.critica ? 'true' : 'false'}"
+          data-tem-refugo="${m.tem_refugo ? 'true' : 'false'}"
           data-alarmes="${encodeURIComponent(m.alarmes || '[]')}">⋮</button>
         <button type="button" class="btn-icon remove-maquina" data-id="${m.id}">×</button>
       </div>
@@ -291,8 +283,9 @@ function renderMaquinas() {
       const sobrevelocidade = btn.dataset.sobrevelocidade;
       const multiplicador = btn.dataset.multiplicador;
       const critica = btn.dataset.critica === 'true';
+      const temRefugo = btn.dataset.temRefugo === 'true';
       const alarmes = JSON.parse(decodeURIComponent(btn.dataset.alarmes));
-      abrirModalConfigMaquina(id, nome, velocidade, sobrevelocidade, multiplicador, critica, alarmes);
+      abrirModalConfigMaquina(id, nome, velocidade, sobrevelocidade, multiplicador, critica, temRefugo, alarmes);
     });
   });
 
@@ -311,7 +304,7 @@ function renderMaquinas() {
     });
   });
 
-  // ── Drag and drop ────────────────────────────────────────
+  // ── Drag and drop ─────────────────────────────────────────
   let dragging = null;
   let dragClone = null;
   let offsetY = 0;
@@ -394,13 +387,11 @@ function limparMaquinas() {
 // MODAL: CONFIGURAR MÁQUINA
 // ============================================================
 
-async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, multiplicador = 1, critica = false, alarmes) {
+async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocidade, multiplicador = 1, critica = false, temRefugo = false, alarmes) {
   document.getElementById('modal-config-maquina')?.remove();
 
-  // Carrega devices WISE existentes para detectar o tipo atual
   let wiseDevices = [];
   try { wiseDevices = await api.listarWiseDevices(estadoConfig.linhaId, maquinaId); } catch { }
-  // Sempre abre nas configurações manuais por default, conforme solicitado
   const tipoAtual = 'manual';
 
   const modal = document.createElement('div');
@@ -449,12 +440,28 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
         <input type="number" step="0.01" min="0.01" id="modal-maq-multiplicador" class="input" placeholder="Ex: 24" value="${multiplicador}">
         <p class="modal-sub" style="margin-top:4px;">Aplicado sobre a velocidade para cálculo de unidades finais.</p>
       </div>
+
+      <!-- Toggle: Máquina crítica -->
       <div class="theme-toggle-row" style="margin-bottom:16px;">
         <div class="theme-toggle-info">
           <span class="theme-toggle-label">Máquina crítica</span>
           <span class="theme-toggle-value" id="modal-maq-critica-label">${critica ? 'Sim' : 'Não'}</span>
         </div>
         <button class="theme-toggle ${critica ? 'active' : ''}" id="modal-maq-critica-toggle" aria-label="Máquina crítica">
+          <span class="theme-toggle-thumb">
+            <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74z"/></svg>
+            <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74z"/></svg>
+          </span>
+        </button>
+      </div>
+
+      <!-- Toggle: Controla refugo -->
+      <div class="theme-toggle-row" style="margin-bottom:16px;">
+        <div class="theme-toggle-info">
+          <span class="theme-toggle-label">Controla refugo</span>
+          <span class="theme-toggle-value" id="modal-maq-refugo-label">${temRefugo ? 'Sim' : 'Não'}</span>
+        </div>
+        <button class="theme-toggle ${temRefugo ? 'active' : ''}" id="modal-maq-refugo-toggle" aria-label="Controla refugo">
           <span class="theme-toggle-thumb">
             <svg class="icon-moon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74z"/></svg>
             <svg class="icon-sun" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.09 6.26L20 10l-5.91 1.74L12 18l-2.09-6.26L4 10l5.91-1.74z"/></svg>
@@ -496,7 +503,6 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
           <p class="modal-sub" style="margin:0;">Defina como calcular produção e refugo</p>
         </div>
         <div id="wise-formulas-list"></div>
-        <!-- CORREÇÃO 1: botão Adicionar fórmula no mesmo tamanho do Salvar -->
         <button type="button" id="btn-wise-add-formula" class="btn btn-primary btn-block" style="margin-top:8px;">+ Adicionar fórmula</button>
       </div>
 
@@ -509,6 +515,7 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
   // ── Estado interno ────────────────────────────────────────
   let tipoSelecionado = tipoAtual;
   let criticaAtual = critica;
+  let temRefugoAtual = temRefugo;
   let alarmesList = [...alarmes];
   let devicesWise = [...wiseDevices];
   let formulasWise = [];
@@ -521,6 +528,15 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
     criticaAtual = !criticaAtual;
     toggleCritica.classList.toggle('active', criticaAtual);
     labelCritica.textContent = criticaAtual ? 'Sim' : 'Não';
+  });
+
+  // ── Toggle refugo ─────────────────────────────────────────
+  const toggleRefugo = document.getElementById('modal-maq-refugo-toggle');
+  const labelRefugo = document.getElementById('modal-maq-refugo-label');
+  toggleRefugo.addEventListener('click', () => {
+    temRefugoAtual = !temRefugoAtual;
+    toggleRefugo.classList.toggle('active', temRefugoAtual);
+    labelRefugo.textContent = temRefugoAtual ? 'Sim' : 'Não';
   });
 
   // ── Seletor de tipo ───────────────────────────────────────
@@ -834,12 +850,19 @@ async function abrirModalConfigMaquina(maquinaId, nome, velocidade, sobrevelocid
         sobrevelocidade: sobrevelocidadeVal,
         multiplicador_produto: multiplicadorVal,
         critica: criticaAtual,
+        tem_refugo: temRefugoAtual,
         ...(tipoSelecionado === 'manual' && { alarmes: JSON.stringify(alarmesList) }),
       };
       await api.atualizarMaquina(estadoConfig.linhaId, maquinaId, dadosSalvar);
       const m = estadoConfig.maquinas.find(m => m.id === maquinaId);
       if (m) {
-        Object.assign(m, { velocidade_nominal: velocidadeVal, sobrevelocidade: sobrevelocidadeVal, multiplicador_produto: multiplicadorVal, critica: criticaAtual });
+        Object.assign(m, {
+          velocidade_nominal: velocidadeVal,
+          sobrevelocidade: sobrevelocidadeVal,
+          multiplicador_produto: multiplicadorVal,
+          critica: criticaAtual,
+          tem_refugo: temRefugoAtual,
+        });
         if (tipoSelecionado === 'manual') m.alarmes = JSON.stringify(alarmesList);
         if (criticaAtual) estadoConfig.maquinas.forEach(maq => { if (maq.id !== maquinaId) maq.critica = false; });
       }
@@ -912,10 +935,7 @@ function abrirModalAdicionarDevice(maquinaId, onSave) {
 }
 
 // ============================================================
-// MODAL: ADICIONAR FÓRMULA — builder de posições
-// Clique nas posições disponíveis para montar a expressão.
-// O botão +/- ao lado de cada posição alterna entre soma e subtração.
-// CORREÇÃO: builder usa innerHTML corretamente para renderizar os botões de toggle.
+// MODAL: ADICIONAR FÓRMULA
 // ============================================================
 
 function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
@@ -950,7 +970,6 @@ function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
         </div>
       </div>
       <p id="formula-preview" style="font-family:monospace;font-size:0.875rem;color:var(--text);text-align:center;min-height:20px;margin-bottom:12px;font-weight:600;"></p>
-      <!-- CORREÇÃO 2: botão Limpar no mesmo tamanho do Salvar fórmula -->
       <button type="button" class="btn btn-outline btn-block" id="btn-formula-limpar" style="margin-bottom:8px;">Limpar</button>
       <button type="button" class="btn btn-primary btn-block" id="btn-salvar-formula">Salvar fórmula</button>
       <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-formula" style="margin-top:8px;">Cancelar</button>
@@ -958,16 +977,13 @@ function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
   `;
   document.body.appendChild(m);
 
-  // Lista de operações: [{posicao, operacao}]
   let operacoes = [];
 
-  // CORREÇÃO 3: builder renderiza via DOM (não innerHTML) para evitar perda de eventos
   function atualizarBuilder() {
     const builder = document.getElementById('formula-builder');
     const placeholder = document.getElementById('formula-placeholder');
     const preview = document.getElementById('formula-preview');
 
-    // Limpa o builder mantendo apenas o placeholder
     [...builder.children].forEach(c => { if (c.id !== 'formula-placeholder') c.remove(); });
 
     if (operacoes.length === 0) {
@@ -982,7 +998,6 @@ function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = 'display:flex;align-items:center;gap:3px;';
 
-      // Botão de toggle +/- (apenas a partir do segundo item)
       if (i > 0) {
         const toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';
@@ -995,13 +1010,11 @@ function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
         wrapper.appendChild(toggleBtn);
       }
 
-      // Chip da posição
       const chip = document.createElement('span');
       chip.textContent = op.posicao;
       chip.style.cssText = 'background:var(--brand-bg);color:var(--brand);padding:3px 10px;border-radius:12px;font-size:0.8rem;font-weight:600;border:1px solid var(--brand);';
       wrapper.appendChild(chip);
 
-      // Botão remover ×
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.textContent = '×';
@@ -1015,12 +1028,10 @@ function abrirModalAdicionarFormula(maquinaId, posicoes, onSave) {
       builder.appendChild(wrapper);
     });
 
-    // Preview de texto
     const expr = operacoes.map((o, i) => `${i > 0 ? ` ${o.operacao} ` : ''}${o.posicao}`).join('');
     preview.textContent = expr;
   }
 
-  // Clique nas posições disponíveis adiciona à fórmula
   m.querySelectorAll('.formula-posicao-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       operacoes.push({ posicao: chip.dataset.posicao, operacao: '+' });
@@ -1085,7 +1096,7 @@ function configurarBotaoReset() {
 }
 
 // ============================================================
-// GESTÃO DE USUÁRIOS — visível apenas para admin
+// GESTÃO DE USUÁRIOS
 // ============================================================
 
 function configurarBotaoUsuarios() {

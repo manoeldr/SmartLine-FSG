@@ -22,10 +22,8 @@
         <span class="med-timer-label">Pronto para iniciar</span>
         <span class="med-timer-sub" id="med-machine-name-pre">Selecione uma máquina para começar</span>
       </div>
-      <button class="btn btn-primary btn-block" id="btn-start-measurement" style="margin-top: 16px;">Iniciar
-        medição</button>
-      <button class="btn btn-outline btn-block hidden" id="btn-retomar-medicao" style="margin-top: 8px;">Retomar medição
-        anterior</button>
+      <button class="btn btn-primary btn-block" id="btn-start-measurement" style="margin-top: 16px;">Iniciar medição</button>
+      <button class="btn btn-outline btn-block hidden" id="btn-retomar-medicao" style="margin-top: 8px;">Retomar medição anterior</button>
     </div>
 
     <!-- MEDIÇÃO ATIVA -->
@@ -70,7 +68,17 @@
         </div>
       </div>
 
-      <button class="btn btn-danger btn-block" id="btn-finalize" style="margin-top: 16px;">Finalizar medição</button>
+      <!-- Botão Pausar — visível durante medição ativa, some durante pausa -->
+      <button class="btn btn-outline btn-block" id="btn-pausar" style="margin-top: 16px;">
+        ⏸ Pausar medição
+      </button>
+
+      <!-- Botão Retomar — visível somente durante pausa -->
+      <button class="btn btn-primary btn-block" id="btn-retomar-pausa" style="margin-top: 16px; display:none;">
+        ▶ Retomar medição
+      </button>
+
+      <button class="btn btn-danger btn-block" id="btn-finalize" style="margin-top: 8px;">Finalizar medição</button>
     </div>
 
     <!-- MEDIÇÃO FINALIZADA -->
@@ -104,14 +112,11 @@
         </p>
       </div>
       <div style="margin-bottom: 16px;">
-        <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Produção do dia até
-          agora</label>
-        <input type="number" id="initial-production-input" placeholder="Ex: 24500" class="input input-lg"
-          inputmode="numeric">
+        <label style="display:block;font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Produção do dia até agora</label>
+        <input type="number" id="initial-production-input" placeholder="Ex: 24500" class="input input-lg" inputmode="numeric">
       </div>
       <button type="button" class="btn btn-primary btn-block" id="btn-confirmar-inicio">Iniciar</button>
-      <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-inicio"
-        style="margin-top:8px;">Cancelar</button>
+      <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-inicio" style="margin-top:8px;">Cancelar</button>
     </div>
   </div>
 
@@ -145,18 +150,31 @@
     </div>
   </div>
 
+  <!-- MODAL: MOTIVO DA PAUSA PROGRAMADA -->
+  <div class="modal-overlay hidden" id="modal-pause-reason">
+    <div class="modal">
+      <h3>Pausa programada</h3>
+      <p class="modal-sub">Selecione o motivo ou digite um novo</p>
+      <div class="alarm-list" id="pause-reason-list" style="margin-bottom:12px;"></div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="text" id="custom-pause-reason-input" placeholder="Outro motivo..." class="input flex-1">
+        <button class="btn btn-sm" id="btn-add-pause-reason">+</button>
+      </div>
+      <button class="btn btn-primary btn-block" id="btn-confirm-pause-reason">Pausar</button>
+    </div>
+  </div>
+
   <!-- MODAL: FINALIZAR -->
   <div class="modal-overlay hidden" id="modal-finalize">
     <div class="modal">
       <h3>Finalizar medição</h3>
       <p class="modal-sub">Informe a produção final (opcional — deixe vazio para usar a última leitura)</p>
       <div id="final-production-group">
-        <input type="number" id="final-production-input" placeholder="Produção final (opcional)" class="input input-lg"
-          inputmode="numeric">
+        <input type="number" id="final-production-input" placeholder="Produção final (opcional)" class="input input-lg" inputmode="numeric">
       </div>
-      <button class="btn btn-danger btn-block" id="btn-confirm-finalize" style="margin-top: 12px;">Confirmar e
-        encerrar</button>
+      <button class="btn btn-danger btn-block" id="btn-confirm-finalize" style="margin-top: 12px;">Confirmar e encerrar</button>
       <button class="btn btn-outline btn-block" id="btn-cancel-finalize" style="margin-top: 8px;">Cancelar</button>
     </div>
   </div>
+
 </div>

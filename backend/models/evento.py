@@ -15,5 +15,7 @@ class Evento(Base):
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     motivo: Mapped[str | None] = mapped_column(String(200), nullable=True)
     producao_leitura: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Leitura do contador de refugo no momento do evento de produção
+    refugo_leitura: Mapped[int | None] = mapped_column(Integer, nullable=True)
     foto_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     medicao: Mapped["Medicao"] = relationship("Medicao", back_populates="eventos")

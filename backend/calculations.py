@@ -28,29 +28,29 @@ def calcular_indicadores(
         velocidade_nominal: velocidade nominal da máquina (unidades/hora)
 
     Retorna dict com:
-        elapsed_ms, running_ms, stopped_ms,
-        num_paradas, disponibilidade, performance, oee,
-        mtbf_ms, mttr_ms, producao, eficiencia
+        elapsed_ms, running_ms, stopped_ms, pausa_ms,
+        num_paradas, disponibilidade, performance, qualidade, oee,
+        mtbf_ms, mttr_ms, producao, refugo, eficiencia
     """
     agora = datetime.now()
     fim = timestamp_fim or agora
-    elapsed_ms = (fim - timestamp_inicio).total_seconds() * 1000
+    total_ms = (fim - timestamp_inicio).total_seconds() * 1000
 
     stopped_ms = 0.0
+    pausa_ms = 0.0
     stop_time = None
+    pausa_time = None
     num_paradas = 0
     ultimo_estado = "rodando"
 
     # Lista de intervalos de funcionamento entre paradas consecutivas
     # Usado para cálculo preciso do MTBF
-    # Formato: [(inicio_funcionamento, fim_funcionamento), ...]
     intervalos_funcionamento = []
-    ultimo_fim_parada = None  # momento em que a última parada terminou (marcha)
+    ultimo_fim_parada = None
 
     for ev in eventos:
         if ev.tipo == "parada":
             if ultimo_fim_parada is not None:
-                # Registra o intervalo de funcionamento desde a última marcha até esta parada
                 intervalos_funcionamento.append(
                     (ev.timestamp - ultimo_fim_parada).total_seconds() * 1000
                 )
@@ -64,14 +64,29 @@ def calcular_indicadores(
             stop_time = None
             ultimo_estado = "rodando"
 
+        elif ev.tipo == "pausa":
+            pausa_time = ev.timestamp
+            ultimo_estado = "pausado"
+
+        elif ev.tipo == "retomada" and pausa_time:
+            pausa_ms += (ev.timestamp - pausa_time).total_seconds() * 1000
+            pausa_time = None
+            ultimo_estado = "rodando"
+
     # Parada ainda em curso (medição ativa)
     if stop_time and not timestamp_fim:
         stopped_ms += (agora - stop_time).total_seconds() * 1000
 
+    # Pausa ainda em curso (medição ativa)
+    if pausa_time and not timestamp_fim:
+        pausa_ms += (agora - pausa_time).total_seconds() * 1000
+
+    # elapsed_ms desconta pausas programadas — pausas não contam como tempo de turno
+    elapsed_ms = max(0.0, total_ms - pausa_ms)
     running_ms = max(0.0, elapsed_ms - stopped_ms)
 
     # ── Disponibilidade ──────────────────────────────────────
-    # Tempo rodando / Tempo total
+    # Tempo rodando / Tempo efetivo (descontando pausas)
     disponibilidade = (running_ms / elapsed_ms * 100) if elapsed_ms > 0 else 0.0
 
     # ── Produção líquida ─────────────────────────────────────
@@ -87,6 +102,17 @@ def calcular_indicadores(
     )
     producao = ultima_leitura - producao_inicial
 
+    # ── Refugo líquido ───────────────────────────────────────
+    # Acumula o delta de refugo entre leituras consecutivas
+    refugo = 0
+    refugo_anterior = 0
+    for ev in producao_eventos:
+        if ev.refugo_leitura is not None:
+            delta_refugo = ev.refugo_leitura - refugo_anterior
+            if delta_refugo > 0:
+                refugo += delta_refugo
+            refugo_anterior = ev.refugo_leitura
+
     # ── Performance ──────────────────────────────────────────
     # Produção real / Produção esperada no tempo rodando
     # Limitada a 100% — sobrevelocidade não infla o indicador
@@ -98,16 +124,21 @@ def calcular_indicadores(
         else 0.0
     )
 
+    # ── Qualidade ────────────────────────────────────────────
+    # (Produção - Refugo) / Produção
+    # Se não houver leituras de refugo, qualidade = 100%
+    if producao > 0 and refugo > 0:
+        qualidade = max(0.0, ((producao - refugo) / producao) * 100)
+    else:
+        qualidade = 100.0
+
     # ── OEE ──────────────────────────────────────────────────
     # Disponibilidade × Performance × Qualidade
-    # Qualidade = 100% por enquanto (refugo não implementado)
-    oee = (disponibilidade / 100) * (performance / 100) * 100
+    oee = (disponibilidade / 100) * (performance / 100) * (qualidade / 100) * 100
 
     # ── MTBF ─────────────────────────────────────────────────
-    # Tempo médio de funcionamento entre falhas.
-    # Calculado como a média dos intervalos de funcionamento
-    # entre paradas consecutivas — requer ao menos 2 paradas.
-    # Com menos de 2 paradas retorna None.
+    # Média dos intervalos de funcionamento entre paradas consecutivas.
+    # Requer ao menos 1 intervalo completo entre duas paradas.
     if len(intervalos_funcionamento) >= 1:
         mtbf_ms = sum(intervalos_funcionamento) / len(intervalos_funcionamento)
     else:
@@ -121,11 +152,14 @@ def calcular_indicadores(
         "elapsed_ms": round(elapsed_ms),
         "running_ms": round(running_ms),
         "stopped_ms": round(stopped_ms),
+        "pausa_ms": round(pausa_ms),
         "num_paradas": num_paradas,
         "ultimo_estado": ultimo_estado,
         "producao": producao,
+        "refugo": refugo,
         "disponibilidade": round(disponibilidade, 1),
         "performance": round(performance, 1),
+        "qualidade": round(qualidade, 1),
         "oee": round(oee, 1),
         "eficiencia": round(disponibilidade, 1),  # alias para disponibilidade
         "mtbf_ms": round(mtbf_ms) if mtbf_ms is not None else None,
@@ -136,6 +170,7 @@ def calcular_indicadores(
 def calcular_paradas_por_motivo(eventos: list, timestamp_fim: Optional[datetime]) -> list:
     """
     Agrupa paradas por motivo com duração e percentual.
+    Eventos de pausa não são incluídos neste cálculo.
 
     Retorna lista de dicts:
         motivo, count, total_ms, percentual
@@ -186,12 +221,6 @@ def calcular_delta_counter(
 
     Se o delta for negativo (reset ou overflow do contador no WISE),
     retorna None para indicar que este intervalo deve ser ignorado.
-
-    Parâmetros:
-        valor_atual: valor acumulado lido no poll atual
-        valor_anterior: valor acumulado lido no poll anterior
-
-    Retorna o delta positivo ou None se inválido.
     """
     delta = valor_atual - valor_anterior
     if delta < 0:
@@ -209,9 +238,7 @@ def aplicar_formula(
 
     Parâmetros:
         operacoes: lista de dicts com "posicao" e "operacao" (+ ou -)
-                   Ex: [{"posicao": "saida", "operacao": "+"}, {"posicao": "inspetor", "operacao": "-"}]
         deltas_por_posicao: dict com o delta calculado para cada posição
-                   Ex: {"saida": 1500.0, "inspetor": 45.0}
 
     Retorna o resultado da fórmula ou None se alguma posição estiver ausente.
     """
@@ -237,20 +264,10 @@ def detectar_estado_di(
     """
     Detecta o estado da máquina com base nas leituras recentes de um canal DI.
 
-    O canal DI é um sensor de passagem de produto — alterna entre 0 e 1
-    conforme produtos passam. Se o sinal ficar estático (sem alternar)
-    por tempo_sem_alteracao_segundos, considera parada.
+    O canal DI alterna entre 0 e 1 conforme produtos passam.
+    Se o sinal ficar estático por tempo_sem_alteracao_segundos → parada.
 
-    Parâmetros:
-        leituras_recentes: lista de dicts com "valor" e "timestamp" (datetime),
-                           ordenados cronologicamente (mais antigo primeiro)
-        tempo_sem_alteracao_segundos: threshold de tempo sem alteração para parada
-        agora: datetime atual (None = datetime.now())
-
-    Retorna:
-        "rodando"  — sinal alternando normalmente
-        "parado"   — sinal estático por mais de tempo_sem_alteracao_segundos
-        None       — sem leituras suficientes para determinar
+    Retorna "rodando", "parado" ou None se sem leituras suficientes.
     """
     if not leituras_recentes:
         return None
@@ -258,7 +275,6 @@ def detectar_estado_di(
     agora = agora or datetime.now()
     threshold = timedelta(seconds=tempo_sem_alteracao_segundos)
 
-    # Percorre as leituras de trás para frente procurando a última alteração
     ultima_alteracao = None
     valor_ref = leituras_recentes[-1]["valor"]
 
@@ -267,7 +283,6 @@ def detectar_estado_di(
             ultima_alteracao = leitura["timestamp"]
             break
 
-    # Se nunca alterou, usa o timestamp da primeira leitura disponível
     if ultima_alteracao is None:
         ultima_alteracao = leituras_recentes[0]["timestamp"]
 
