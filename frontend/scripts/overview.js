@@ -29,9 +29,7 @@ export async function initOverview() {
   lastFluxoUpdateTime = 0;
   linhaAtualId = store.config.linhaId || null;
 
-  if (!linhaAtualId) {
-    linhaAtualId = await detectarLinhaAtiva();
-  }
+  if (!linhaAtualId) linhaAtualId = await detectarLinhaAtiva();
 
   iniciarClock();
   await inicializarFiltros();
@@ -46,7 +44,6 @@ async function detectarLinhaAtiva() {
     const medicoes = await api.listarMedicoes({});
     const ativa = medicoes.find(m => !m.timestamp_fim && m.linha_id);
     if (ativa?.linha_id) return ativa.linha_id;
-
     const clientes = await api.listarClientes();
     if (clientes.length > 0) {
       const linhas = await api.listarLinhas(clientes[0].id);
@@ -84,7 +81,6 @@ function atualizarClock() {
 async function inicializarFiltros() {
   const linhaId = linhaAtualId;
   if (!linhaId) return;
-
   try {
     const [maquinas, filtros] = await Promise.all([
       api.listarMaquinas(linhaId),
@@ -96,8 +92,7 @@ async function inicializarFiltros() {
       selMaquina.innerHTML = '<option value="">Todas</option>';
       maquinas.forEach(m => {
         const opt = document.createElement('option');
-        opt.value = m.id;
-        opt.textContent = m.nome;
+        opt.value = m.id; opt.textContent = m.nome;
         selMaquina.appendChild(opt);
       });
     }
@@ -138,12 +133,10 @@ function configurarFiltroUI() {
     const maquinaId = document.getElementById('ov-filter-maquina')?.value;
     const turno = document.getElementById('ov-filter-turno')?.value;
     const data = document.getElementById('ov-filter-data')?.value;
-
     filtrosAtivos = { linhaId: linhaAtualId };
     if (maquinaId) filtrosAtivos.maquinaLinhaId = maquinaId;
     if (turno) filtrosAtivos.turnoInicio = turno;
     if (data) { filtrosAtivos.dataInicio = data; filtrosAtivos.dataFim = data; }
-
     filterPanel?.classList.add('hidden');
     filterBtn?.classList.toggle('active', !!(maquinaId || turno || data));
     await carregarDadosCritica();
@@ -182,7 +175,6 @@ async function carregarDadosCritica() {
     if (headerInfo) headerInfo.textContent = `${store.config.client || '—'} · ${store.config.machine || 'Linha'}`;
 
     const critica = status.find(m => m.critica);
-
     if (!critica) {
       document.getElementById('ov-critica-nome').textContent = 'Não definida';
       limparKPIs();
@@ -203,11 +195,8 @@ async function carregarDadosCritica() {
 
     if (critica.estado !== 'sem_informacao') {
       const medicoes = await api.listarMedicoes({
-        linhaId,
-        maquinaLinhaId: critica.maquina_id,
-        ...filtrosAtivos,
+        linhaId, maquinaLinhaId: critica.maquina_id, ...filtrosAtivos,
       });
-
       if (medicoes.length > 0) {
         const indicadores = await api.indicadoresMedicao(medicoes[0].id);
         exibirIndicadores(indicadores);
@@ -293,41 +282,19 @@ function renderBarChart(medicao) {
     data: {
       labels,
       datasets: [
-        {
-          label: 'Real',
-          data: realValues,
-          backgroundColor: 'rgba(59,130,246,0.7)',
-          borderRadius: 4,
-        },
-        {
-          label: 'Nominal',
-          data: nominalValues,
-          type: 'line',
-          borderColor: '#22c55e',
-          borderDash: [6, 3],
-          backgroundColor: 'transparent',
-          fill: false,
-          tension: 0,
-          pointRadius: 0,
-          borderWidth: 2,
-        }
+        { label: 'Real', data: realValues, backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 4 },
+        { label: 'Nominal', data: nominalValues, type: 'line', borderColor: '#22c55e', borderDash: [6, 3], backgroundColor: 'transparent', fill: false, tension: 0, pointRadius: 0, borderWidth: 2 }
       ]
     },
     options: {
-      responsive: true,
-      animation: false,
+      responsive: true, animation: false,
       plugins: {
         legend: { labels: { color: '#94a3b8', font: { size: 12 }, usePointStyle: true } },
         tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y?.toLocaleString('pt-BR')} un` } }
       },
       scales: {
         x: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { color: 'rgba(148,163,184,0.08)' } },
-        y: {
-          ticks: { color: '#94a3b8', font: { size: 11 } },
-          grid: { color: 'rgba(148,163,184,0.08)' },
-          beginAtZero: true,
-          title: { display: true, text: 'unidades', color: '#64748b', font: { size: 11 } }
-        }
+        y: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { color: 'rgba(148,163,184,0.08)' }, beginAtZero: true, title: { display: true, text: 'unidades', color: '#64748b', font: { size: 11 } } }
       }
     }
   });
@@ -368,15 +335,12 @@ async function renderFluxoLinha() {
         ? '<span style="position:absolute;bottom:3px;right:4px;font-size:0.45rem;font-weight:700;color:var(--brand);letter-spacing:0.3px;line-height:1;">IOT</span>'
         : '';
 
-      const seta = i < status.length - 1
-        ? `<span class="fluxo-seta ${estado}">→</span>`
-        : '';
+      const seta = i < status.length - 1 ? `<span class="fluxo-seta ${estado}">→</span>` : '';
 
       return `
         <div class="fluxo-maquina" data-maquina-id="${m.maquina_id}">
           <div class="fluxo-maquina-box ${estado}">
-            ${criticaStar}
-            ${badgeSemiAuto}
+            ${criticaStar}${badgeSemiAuto}
             <span class="fluxo-maquina-dot ${estado}"></span>
             ${abrev}
           </div>
@@ -394,7 +358,6 @@ async function renderFluxoLinha() {
         if (maquina) abrirModalMaquina(maquina);
       });
     });
-
   } catch {
     container.innerHTML = '<p class="empty-state-sm">Erro ao carregar fluxo</p>';
   }
@@ -404,22 +367,24 @@ async function renderFluxoLinha() {
 // MODAL: DETALHES DA MÁQUINA
 // ============================================================
 
+// medicaoAtiva é salva aqui para uso no modal de edição de categoria
+let _medicaoAtualModal = null;
+
 async function abrirModalMaquina(maquina) {
   const modal = document.getElementById('modal-maquina-detalhes');
   if (!modal) return;
+
+  _medicaoAtualModal = null;
 
   const dot = document.getElementById('modal-maq-dot');
   if (dot) dot.className = `status-dot-inline ${maquina.estado}`;
   document.getElementById('modal-maq-nome').textContent = maquina.maquina_nome;
 
   const statusLabels = {
-    rodando: 'Rodando',
-    parado: 'Parada',
-    sem_informacao: 'Sem informação',
-    ultima_medicao: 'Última medição',
+    rodando: 'Rodando', parado: 'Parada',
+    sem_informacao: 'Sem informação', ultima_medicao: 'Última medição',
   };
   document.getElementById('modal-maq-sub').textContent = statusLabels[maquina.estado] || '—';
-
   document.getElementById('modal-maq-producao').textContent = maquina.producao !== null && maquina.producao !== undefined
     ? maquina.producao.toLocaleString('pt-BR') : '0';
   document.getElementById('modal-maq-eficiencia').textContent = maquina.eficiencia !== null ? `${maquina.eficiencia}%` : '0%';
@@ -452,12 +417,12 @@ async function abrirModalMaquina(maquina) {
 
   try {
     const medicoes = await api.listarMedicoes({
-      linhaId: linhaAtualId,
-      maquinaLinhaId: maquina.maquina_id,
+      linhaId: linhaAtualId, maquinaLinhaId: maquina.maquina_id,
     });
 
     if (medicoes.length > 0) {
       const medicao = medicoes[0];
+      _medicaoAtualModal = medicao;
 
       const subEl = document.getElementById('modal-maq-sub');
       if (subEl) {
@@ -466,7 +431,6 @@ async function abrirModalMaquina(maquina) {
           day: '2-digit', month: '2-digit', year: 'numeric',
           hour: '2-digit', minute: '2-digit',
         });
-
         if (maquina.estado === 'rodando' || maquina.estado === 'parado') {
           const auditor = medicao.usuario_nome || '—';
           const tipoStr = medicao.tipo === 'semiautomatico' ? ' · Semi Auto' : '';
@@ -490,6 +454,7 @@ function fecharModal() {
   document.getElementById('modal-maquina-detalhes')?.classList.add('hidden');
   document.body.classList.remove('modal-open');
   if (modalPieChart) { modalPieChart.destroy(); modalPieChart = null; }
+  _medicaoAtualModal = null;
 }
 
 function renderModalDonutFromIndicadores(ind, medicao) {
@@ -519,27 +484,13 @@ function renderModalDonutFromIndicadores(ind, medicao) {
     type: 'doughnut',
     data: {
       labels: paradas.map(p => p.motivo),
-      datasets: [{
-        data: paradas.map(p => p.total_ms),
-        backgroundColor: PIE_COLORS,
-        borderWidth: 0,
-        hoverOffset: 4,
-      }]
+      datasets: [{ data: paradas.map(p => p.total_ms), backgroundColor: PIE_COLORS, borderWidth: 0, hoverOffset: 4 }]
     },
     options: {
-      responsive: false,
-      animation: false,
-      cutout: '65%',
+      responsive: false, animation: false, cutout: '65%',
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const mins = Math.floor(ctx.parsed / 60000);
-              return `${ctx.label}: ${mins}min (${paradas[ctx.dataIndex].percentual}%)`;
-            }
-          }
-        }
+        tooltip: { callbacks: { label: ctx => { const mins = Math.floor(ctx.parsed / 60000); return `${ctx.label}: ${mins}min (${paradas[ctx.dataIndex].percentual}%)`; } } }
       }
     }
   });
@@ -548,11 +499,14 @@ function renderModalDonutFromIndicadores(ind, medicao) {
     const mins = Math.floor(p.total_ms / 60000);
     const secs = Math.floor((p.total_ms % 60000) / 1000);
     const tempoStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    const catColor = p.categoria === 'Externa' ? 'var(--amber)' : 'var(--red)';
+    const catLabel = p.categoria || 'Interna';
     return `
       <div class="modal-donut-legend-item">
         <div class="modal-donut-legend-row">
           <span class="modal-donut-dot" style="background:${PIE_COLORS[i % PIE_COLORS.length]}"></span>
           <span class="modal-donut-legend-nome">${p.motivo}</span>
+          <span style="font-size:0.6rem;font-weight:600;color:${catColor};margin-left:4px;">${catLabel}</span>
         </div>
         <span class="modal-donut-legend-detalhe">${tempoStr} · ${p.percentual}%</span>
       </div>
@@ -562,8 +516,8 @@ function renderModalDonutFromIndicadores(ind, medicao) {
 
 // ============================================================
 // TIMELINE DE EVENTOS DO MODAL
-// Inclui parada, marcha, produção, pausa programada e retomada.
-// Pausas aparecem em roxo com motivo da pausa.
+// Eventos de parada têm botão para editar categoria (Interna/Externa).
+// Apenas admin e auditor podem editar (cliente-level não vê o botão).
 // ============================================================
 
 function renderModalEventos(eventos, medicao) {
@@ -572,24 +526,15 @@ function renderModalEventos(eventos, medicao) {
   if (!container) return;
 
   const eventoInicio = {
-    tipo: 'inicio',
-    timestamp: medicao.timestamp_inicio,
-    motivo: null,
-    producao_leitura: medicao.producao_inicial ?? null,
-    foto_path: null,
+    tipo: 'inicio', timestamp: medicao.timestamp_inicio,
+    motivo: null, producao_leitura: medicao.producao_inicial ?? null, foto_path: null,
   };
-
   const eventosFim = medicao.timestamp_fim ? [{
-    tipo: 'fim',
-    timestamp: medicao.timestamp_fim,
-    motivo: null,
-    producao_leitura: medicao.producao_final ?? null,
-    foto_path: null,
+    tipo: 'fim', timestamp: medicao.timestamp_fim,
+    motivo: null, producao_leitura: medicao.producao_final ?? null, foto_path: null,
   }] : [];
 
   const todosEventos = [eventoInicio, ...eventos, ...eventosFim];
-
-  // Inclui pausa e retomada na lista de eventos relevantes
   const relevantes = [...todosEventos]
     .filter(e => ['parada', 'marcha', 'producao', 'inicio', 'fim', 'pausa', 'retomada'].includes(e.tipo))
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -611,32 +556,24 @@ function renderModalEventos(eventos, medicao) {
     parada: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`,
     marcha: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
     producao: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
-    // Ícone de pausa — dois traços verticais
     pausa: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>`,
-    // Ícone de retomada — seta para frente
     retomada: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
   };
 
   const labelPorTipo = {
-    inicio: 'Início da medição',
-    fim: 'Medição finalizada',
-    parada: 'Parada',
-    marcha: 'Rodando',
-    producao: 'Produção',
-    pausa: 'Pausa programada',
-    retomada: 'Retomada',
+    inicio: 'Início da medição', fim: 'Medição finalizada',
+    parada: 'Parada', marcha: 'Rodando', producao: 'Produção',
+    pausa: 'Pausa programada', retomada: 'Retomada',
   };
 
-  // Cor do ícone por tipo — pausa e retomada em roxo
   const corPorTipo = {
-    inicio: 'marcha',
-    fim: 'parada',
-    parada: 'parada',
-    marcha: 'marcha',
-    producao: 'producao',
-    pausa: 'pausa',
-    retomada: 'pausa',
+    inicio: 'marcha', fim: 'parada', parada: 'parada',
+    marcha: 'marcha', producao: 'producao', pausa: 'pausa', retomada: 'pausa',
   };
+
+  // Apenas admin e auditor podem editar categoria
+  const nivelUsuario = window.usuarioAtual?.nivel;
+  const podeEditarCategoria = nivelUsuario === 'admin' || nivelUsuario === 'auditor';
 
   container.innerHTML = relevantes.map(ev => {
     const hora = new Date(ev.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -666,12 +603,26 @@ function renderModalEventos(eventos, medicao) {
       }
     }
 
+    // Badge de categoria para paradas — cor diferente por tipo
+    let categoriaBadge = '';
+    if (ev.tipo === 'parada') {
+      const cat = ev.categoria || 'Interna';
+      const catColor = cat === 'Externa' ? 'var(--amber)' : 'var(--red)';
+      categoriaBadge = `<span class="evento-categoria-badge" data-evento-id="${ev.id}" data-medicao-id="${medicao.id}" data-categoria="${cat}"
+        style="font-size:0.6rem;font-weight:700;color:${catColor};background:${cat === 'Externa' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)'};padding:2px 6px;border-radius:8px;border:1px solid ${catColor};cursor:${podeEditarCategoria ? 'pointer' : 'default'};">
+        ${cat}
+      </span>`;
+    }
+
     return `
       <div class="evento-item">
         <span class="evento-hora">${hora}</span>
         <div class="evento-icone ${cor}">${icone}</div>
         <div class="evento-body">
-          <div class="evento-tipo">${label}</div>
+          <div class="evento-tipo" style="display:flex;align-items:center;gap:6px;">
+            ${label}
+            ${categoriaBadge}
+          </div>
           ${motivo ? `<div class="evento-motivo">${motivo}</div>` : ''}
         </div>
         <div class="evento-right" style="margin-left:auto;display:flex;align-items:flex-start;gap:14px;">
@@ -687,12 +638,88 @@ function renderModalEventos(eventos, medicao) {
     `;
   }).join('');
 
+  // Listener para editar categoria ao clicar no badge
+  if (podeEditarCategoria) {
+    container.querySelectorAll('.evento-categoria-badge').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const eventoId = parseInt(badge.dataset.eventoId);
+        const medicaoId = parseInt(badge.dataset.medicaoId);
+        const categoriaAtual = badge.dataset.categoria;
+        abrirModalEditarCategoria(eventoId, medicaoId, categoriaAtual, badge, medicao.eventos);
+      });
+    });
+  }
+
   container.querySelectorAll('.btn-evento-foto').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       abrirModalFoto(btn.getAttribute('data-foto'));
     });
   });
+}
+
+// ============================================================
+// MODAL: EDITAR CATEGORIA DA PARADA
+// Mini modal inline com duas opções: Interna / Externa
+// ============================================================
+
+function abrirModalEditarCategoria(eventoId, medicaoId, categoriaAtual, badgeEl, eventos) {
+  // Remove modal anterior se existir
+  document.getElementById('modal-editar-categoria')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-editar-categoria';
+  modal.className = 'modal-overlay';
+  modal.innerHTML = `
+    <div class="modal" style="max-width:320px;">
+      <h3>Categoria da parada</h3>
+      <p class="modal-sub">Classifique esta parada para o cálculo correto do OEE</p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+        <button type="button" class="btn-cat-opcao ${categoriaAtual === 'Interna' ? 'ativa' : ''}"
+          data-cat="Interna"
+          style="padding:14px;border-radius:var(--radius-sm);border:2px solid ${categoriaAtual === 'Interna' ? 'var(--red)' : 'var(--border)'};background:${categoriaAtual === 'Interna' ? 'rgba(239,68,68,0.08)' : 'var(--bg)'};cursor:pointer;text-align:left;">
+          <div style="font-size:0.875rem;font-weight:700;color:var(--red);">Interna</div>
+          <div style="font-size:0.75rem;color:var(--text-dim);margin-top:2px;">Falha de equipamento, setup, ajuste — penaliza o OEE</div>
+        </button>
+        <button type="button" class="btn-cat-opcao ${categoriaAtual === 'Externa' ? 'ativa' : ''}"
+          data-cat="Externa"
+          style="padding:14px;border-radius:var(--radius-sm);border:2px solid ${categoriaAtual === 'Externa' ? 'var(--amber)' : 'var(--border)'};background:${categoriaAtual === 'Externa' ? 'rgba(245,158,11,0.08)' : 'var(--bg)'};cursor:pointer;text-align:left;">
+          <div style="font-size:0.875rem;font-weight:700;color:var(--amber);">Externa</div>
+          <div style="font-size:0.75rem;color:var(--text-dim);margin-top:2px;">Falta de material, aguardando operador — não penaliza o OEE</div>
+        </button>
+      </div>
+      <button type="button" class="btn btn-outline btn-block" id="btn-cancelar-categoria">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelectorAll('.btn-cat-opcao').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const novaCategoria = btn.dataset.cat;
+      if (novaCategoria === categoriaAtual) { modal.remove(); return; }
+
+      try {
+        await api.atualizarCategoriaEvento(medicaoId, eventoId, novaCategoria);
+
+        // Atualiza o badge visualmente sem recarregar tudo
+        const catColor = novaCategoria === 'Externa' ? 'var(--amber)' : 'var(--red)';
+        badgeEl.textContent = novaCategoria;
+        badgeEl.dataset.categoria = novaCategoria;
+        badgeEl.style.color = catColor;
+        badgeEl.style.background = novaCategoria === 'Externa' ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)';
+        badgeEl.style.borderColor = catColor;
+
+        modal.remove();
+      } catch (e) {
+        console.warn('[overview] Erro ao atualizar categoria:', e);
+        modal.remove();
+      }
+    });
+  });
+
+  document.getElementById('btn-cancelar-categoria').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
 }
 
 // ============================================================

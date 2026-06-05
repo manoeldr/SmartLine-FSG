@@ -5,6 +5,8 @@ from pydantic import BaseModel
 class EventoCreate(BaseModel):
     tipo: str
     motivo: str | None = None
+    # Categoria da parada: "Interna" ou "Externa"
+    categoria: str | None = None
     producao_leitura: int | None = None
     refugo_leitura: int | None = None
 
@@ -15,8 +17,13 @@ class EventoResponse(BaseModel):
     tipo: str
     timestamp: datetime
     motivo: str | None = None
+    categoria: str | None = None
     producao_leitura: int | None = None
     refugo_leitura: int | None = None
     foto_path: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class EventoCategoriaUpdate(BaseModel):
+    categoria: str  # "Interna" ou "Externa"

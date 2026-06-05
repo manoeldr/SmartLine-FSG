@@ -142,6 +142,18 @@ if 'eventos' in inspector.get_table_names():
             except Exception:
                 pass
 
+# Migração: categoria em eventos
+# Classifica paradas como Interna (penaliza OEE) ou Externa (não penaliza OEE)
+if 'eventos' in inspector.get_table_names():
+    col_names = [c['name'] for c in inspector.get_columns('eventos')]
+    if 'categoria' not in col_names:
+        with engine.connect() as conn:
+            try:
+                conn.execute(text('ALTER TABLE eventos ADD COLUMN categoria VARCHAR(20)'))
+                conn.commit()
+            except Exception:
+                pass
+
 app = FastAPI()
 
 app.add_middleware(

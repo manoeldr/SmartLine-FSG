@@ -22,7 +22,6 @@ const defaultData = () => ({
     alarms: [],
     productionInterval: 30,
     theme: 'light',
-    // Flag: se true, exibe campo de refugo no modal de produção periódica
     temRefugo: false,
   },
   measurement: {
@@ -139,15 +138,16 @@ export const store = {
     for (const ev of pending) {
       try {
         if (ev.type === 'marcha') {
-          await api.registrarEvento(m.medicaoId, 'marcha', ev.reason || null);
+          await api.registrarEvento(m.medicaoId, 'marcha', null, null, null, null);
         } else if (ev.type === 'stop') {
-          await api.registrarEvento(m.medicaoId, 'parada', ev.reason || null);
+          // Envia categoria junto com o motivo
+          await api.registrarEvento(m.medicaoId, 'parada', ev.reason || null, null, null, ev.category || null);
         } else if (ev.type === 'production') {
-          await api.registrarEvento(m.medicaoId, 'producao', null, ev.value, ev.refugo || null);
+          await api.registrarEvento(m.medicaoId, 'producao', null, ev.value, ev.refugo || null, null);
         } else if (ev.type === 'pausa') {
-          await api.registrarEvento(m.medicaoId, 'pausa', ev.reason || null);
+          await api.registrarEvento(m.medicaoId, 'pausa', ev.reason || null, null, null, null);
         } else if (ev.type === 'retomada') {
-          await api.registrarEvento(m.medicaoId, 'retomada', null);
+          await api.registrarEvento(m.medicaoId, 'retomada', null, null, null, null);
         }
       } catch {
         break;
@@ -174,7 +174,7 @@ export const store = {
           eventsLocal.push({ type: 'marcha', time: ev.timestamp });
           ultimoEstado = 'running';
         } else if (ev.tipo === 'parada') {
-          eventsLocal.push({ type: 'stop', time: ev.timestamp, reason: ev.motivo || null, category: null, backendId: ev.id || null });
+          eventsLocal.push({ type: 'stop', time: ev.timestamp, reason: ev.motivo || null, category: ev.categoria || null, backendId: ev.id || null });
           ultimoEstado = 'stopped';
         } else if (ev.tipo === 'producao' && ev.producao_leitura !== null) {
           eventsLocal.push({ type: 'production', time: ev.timestamp, value: ev.producao_leitura, refugo: ev.refugo_leitura || null });
@@ -276,6 +276,8 @@ export const store = {
     if (m.medicaoId) api.registrarEvento(m.medicaoId, 'marcha').catch(() => {});
   },
 
+  // Atualiza motivo e categoria da última parada registrada.
+  // Envia categoria ao backend junto com o motivo.
   setStopReason(reason, category = null) {
     const m = this._data.measurement;
     const lastStop = [...m.events].reverse().find(e => e.type === 'stop');
@@ -284,7 +286,13 @@ export const store = {
       lastStop.category = category || this.getAlarmCategory(reason);
       this.save();
       if (m.medicaoId && lastStop.backendId) {
+        // Atualiza motivo
         api.atualizarMotivoEvento(m.medicaoId, lastStop.backendId, reason).catch(() => {});
+        // Atualiza categoria
+        const cat = lastStop.category;
+        if (cat) {
+          api.atualizarCategoriaEvento(m.medicaoId, lastStop.backendId, cat).catch(() => {});
+        }
       }
     }
   },
@@ -294,6 +302,7 @@ export const store = {
     return alarm ? alarm.category : 'Interna';
   },
 
+  // Registra evento de parada — envia categoria imediatamente ao backend.
   setParada() {
     const m = this._data.measurement;
     m.state = 'stopped';
@@ -302,7 +311,7 @@ export const store = {
     m.lastSyncedEventIndex = m.events.length;
     this.save();
     if (m.medicaoId) {
-      api.registrarEvento(m.medicaoId, 'parada').then(resultado => {
+      api.registrarEvento(m.medicaoId, 'parada', null, null, null, null).then(resultado => {
         if (resultado?.id) {
           evento.backendId = resultado.id;
           this.save();
@@ -340,29 +349,20 @@ export const store = {
     }
   },
 
-  isPaused() {
-    return this._data.measurement.state === 'paused';
-  },
+  isPaused() { return this._data.measurement.state === 'paused'; },
 
   getPausaMs() {
     const m = this._data.measurement;
-    const events = m.events;
     let pausaMs = 0;
     let pauseStart = null;
-
-    for (const ev of events) {
-      if (ev.type === 'pausa') {
-        pauseStart = new Date(ev.time);
-      } else if (ev.type === 'retomada' && pauseStart) {
+    for (const ev of m.events) {
+      if (ev.type === 'pausa') pauseStart = new Date(ev.time);
+      else if (ev.type === 'retomada' && pauseStart) {
         pausaMs += new Date(ev.time) - pauseStart;
         pauseStart = null;
       }
     }
-
-    if (pauseStart && m.state === 'paused') {
-      pausaMs += Date.now() - pauseStart.getTime();
-    }
-
+    if (pauseStart && m.state === 'paused') pausaMs += Date.now() - pauseStart.getTime();
     return pausaMs;
   },
 
@@ -370,9 +370,7 @@ export const store = {
     const m = this._data.measurement;
     if (m.state !== 'paused') return 0;
     for (let i = m.events.length - 1; i >= 0; i--) {
-      if (m.events[i].type === 'pausa') {
-        return Date.now() - new Date(m.events[i].time).getTime();
-      }
+      if (m.events[i].type === 'pausa') return Date.now() - new Date(m.events[i].time).getTime();
     }
     return 0;
   },
@@ -388,7 +386,7 @@ export const store = {
     m.events.push({ type: 'production', time: new Date().toISOString(), value, refugo });
     m.lastSyncedEventIndex = m.events.length;
     this.save();
-    if (m.medicaoId) api.registrarEvento(m.medicaoId, 'producao', null, value, refugo).catch(() => {});
+    if (m.medicaoId) api.registrarEvento(m.medicaoId, 'producao', null, value, refugo, null).catch(() => {});
   },
 
   getDisplayProduction() {
@@ -467,13 +465,8 @@ export const store = {
     return Math.max(0, total - this.getPausaMs());
   },
 
-  getRunningMs() {
-    return Math.max(0, this.getElapsedMs() - this.getStoppedMs());
-  },
-
-  getStoppedMs() {
-    return this.getStops().reduce((sum, s) => sum + s.durationMs, 0);
-  },
+  getRunningMs() { return Math.max(0, this.getElapsedMs() - this.getStoppedMs()); },
+  getStoppedMs() { return this.getStops().reduce((sum, s) => sum + s.durationMs, 0); },
 
   // ============================================================
   // VERIFICAÇÕES PERIÓDICAS
@@ -484,15 +477,11 @@ export const store = {
     if (!m.active || m.state !== 'running') return false;
     if (!m.startTime) return false;
     if (m.tipo !== 'manual') return false;
-
     const intervalMs = (this._data.config.productionInterval || 60) * 60 * 1000;
     const elapsed = Date.now() - new Date(m.startTime).getTime();
     const currentSlot = Math.floor(elapsed / intervalMs);
-
     if (currentSlot < 1) return false;
-
-    const lastSlot = m.lastProductionSlot || 0;
-    return currentSlot > lastSlot;
+    return currentSlot > (m.lastProductionSlot || 0);
   },
 
   shouldPromptShiftEnd() {
@@ -521,9 +510,7 @@ export const store = {
 
   finalizeMeasurement() {
     const m = this._data.measurement;
-    if (m.state === 'paused') {
-      this.setRetomada();
-    }
+    if (m.state === 'paused') this.setRetomada();
     m.active = false;
     m.state = 'finished';
     m.endTime = new Date().toISOString();

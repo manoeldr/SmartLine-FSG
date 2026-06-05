@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models.evento import Evento
 from backend.models.medicao import Medicao
-from backend.schemas.evento import EventoCreate, EventoResponse
+from backend.schemas.evento import EventoCreate, EventoResponse, EventoCategoriaUpdate
 
 router = APIRouter(prefix="/medicoes/{medicao_id}/eventos", tags=["eventos"])
 
@@ -20,8 +20,14 @@ else:
 FOTOS_DIR = BASE_DIR / "fotos"
 FOTOS_DIR.mkdir(exist_ok=True)
 
+# Tipos de evento válidos
+TIPOS_VALIDOS = {"marcha", "parada", "producao", "pausa", "retomada"}
 
-# Registra um novo evento na medição (marcha, parada ou produção).
+# Categorias válidas para paradas
+CATEGORIAS_VALIDAS = {"Interna", "Externa"}
+
+
+# Registra um novo evento na medição.
 @router.post("/", response_model=EventoResponse)
 def registrar_evento(medicao_id: int, dados: EventoCreate, db: Session = Depends(get_db)):
     medicao = db.query(Medicao).filter(Medicao.id == medicao_id).first()
@@ -29,8 +35,12 @@ def registrar_evento(medicao_id: int, dados: EventoCreate, db: Session = Depends
         raise HTTPException(status_code=404, detail="Medição não encontrada")
     if medicao.timestamp_fim:
         raise HTTPException(status_code=400, detail="Medição já finalizada")
-    if dados.tipo not in ("marcha", "parada", "producao"):
-        raise HTTPException(status_code=422, detail="Tipo deve ser 'marcha', 'parada' ou 'producao'")
+    if dados.tipo not in TIPOS_VALIDOS:
+        raise HTTPException(status_code=422, detail=f"Tipo deve ser um de: {', '.join(TIPOS_VALIDOS)}")
+
+    # Valida categoria se informada
+    if dados.categoria and dados.categoria not in CATEGORIAS_VALIDAS:
+        raise HTTPException(status_code=422, detail=f"Categoria deve ser 'Interna' ou 'Externa'")
 
     evento = Evento(medicao_id=medicao_id, **dados.model_dump())
     db.add(evento)
@@ -63,8 +73,34 @@ def atualizar_motivo(medicao_id: int, evento_id: int, motivo: str, db: Session =
     return evento
 
 
+# Atualiza a categoria de um evento de parada (Interna ou Externa).
+# Usado pelo auditor/admin para corrigir a classificação de uma parada.
+@router.patch("/{evento_id}/categoria", response_model=EventoResponse)
+def atualizar_categoria(
+    medicao_id: int,
+    evento_id: int,
+    dados: EventoCategoriaUpdate,
+    db: Session = Depends(get_db)
+):
+    if dados.categoria not in CATEGORIAS_VALIDAS:
+        raise HTTPException(status_code=422, detail="Categoria deve ser 'Interna' ou 'Externa'")
+
+    evento = db.query(Evento).filter(
+        Evento.id == evento_id,
+        Evento.medicao_id == medicao_id
+    ).first()
+    if not evento:
+        raise HTTPException(status_code=404, detail="Evento não encontrado")
+    if evento.tipo != "parada":
+        raise HTTPException(status_code=422, detail="Apenas eventos de parada têm categoria")
+
+    evento.categoria = dados.categoria
+    db.commit()
+    db.refresh(evento)
+    return evento
+
+
 # Recebe uma imagem, corrige orientação EXIF, comprime para PNG e salva em fotos/.
-# Registra o caminho no campo foto_path do evento.
 @router.post("/{evento_id}/foto", response_model=EventoResponse)
 async def upload_foto(
     medicao_id: int,
@@ -85,12 +121,9 @@ async def upload_foto(
     if not evento:
         raise HTTPException(status_code=404, detail="Evento não encontrado")
 
-    # Lê a imagem
     conteudo = await foto.read()
     img = Image.open(io.BytesIO(conteudo))
 
-    # Corrige orientação baseada nos metadados EXIF
-    # Fotos de celular frequentemente têm rotação embutida nos metadados
     try:
         exif = img._getexif()
         if exif:
@@ -104,19 +137,16 @@ async def upload_foto(
                         img = img.rotate(90, expand=True)
                     break
     except Exception:
-        pass  # Ignora erros de EXIF — continua sem corrigir
+        pass
 
-    # Converte para RGB se necessário (ex: RGBA, CMYK)
     if img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
 
-    # Redimensiona se muito grande (max 1280px no lado maior)
     max_size = 1280
     if img.width > max_size or img.height > max_size:
         img.thumbnail((max_size, max_size), Image.LANCZOS)
 
-    # Salva como PNG comprimido
-    nome_arquivo = f"ev_{evento_id}_med_{medicao_id}.png"
+    nome_arquivo = f"ev_{evento_id}med{medicao_id}.png"
     caminho = FOTOS_DIR / nome_arquivo
 
     buffer = io.BytesIO()
@@ -124,7 +154,6 @@ async def upload_foto(
     with open(caminho, "wb") as f:
         f.write(buffer.getvalue())
 
-    # Salva o caminho relativo no banco
     evento.foto_path = f"fotos/{nome_arquivo}"
     db.commit()
     db.refresh(evento)
